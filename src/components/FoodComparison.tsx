@@ -16,6 +16,7 @@ interface FoodData {
 interface ComparisonResult {
   food1: FoodData;
   food2: FoodData;
+  insights?: string;
 }
 
 const FoodComparison: React.FC = () => {
@@ -291,17 +292,26 @@ const FoodComparison: React.FC = () => {
               </table>
             </div>
             
-            <div className="mt-4 p-3 bg-wellness-softGreen/30 rounded-lg text-sm">
-              <span className="font-medium text-wellness-darkGreen">Summary:</span> {' '}
-              {result.food1.calories < result.food2.calories
-                ? `${result.food1.name} has ${(result.food2.calories - result.food1.calories).toFixed(1)} fewer calories than ${result.food2.name}.`
-                : `${result.food2.name} has ${(result.food1.calories - result.food2.calories).toFixed(1)} fewer calories than ${result.food1.name}.`
-              } {' '}
-              {result.food1.protein > result.food2.protein
-                ? `${result.food1.name} provides ${(result.food1.protein - result.food2.protein).toFixed(1)}g more protein.`
-                : `${result.food2.name} provides ${(result.food2.protein - result.food1.protein).toFixed(1)}g more protein.`
-              }
-            </div>
+            {result.insights && (
+              <div className="mt-4 p-4 bg-wellness-softGreen/30 rounded-lg">
+                <h4 className="font-medium text-wellness-darkGreen mb-2">AI Insights</h4>
+                <p className="text-wellness-charcoal text-sm whitespace-pre-line">{result.insights}</p>
+              </div>
+            )}
+            
+            {!result.insights && (
+              <div className="mt-4 p-3 bg-wellness-softGreen/30 rounded-lg text-sm">
+                <span className="font-medium text-wellness-darkGreen">Summary:</span> {' '}
+                {result.food1.calories < result.food2.calories
+                  ? `${result.food1.name} has ${(result.food2.calories - result.food1.calories).toFixed(1)} fewer calories than ${result.food2.name}.`
+                  : `${result.food2.name} has ${(result.food1.calories - result.food2.calories).toFixed(1)} fewer calories than ${result.food1.name}.`
+                } {' '}
+                {result.food1.protein > result.food2.protein
+                  ? `${result.food1.name} provides ${(result.food1.protein - result.food2.protein).toFixed(1)}g more protein.`
+                  : `${result.food2.name} provides ${(result.food2.protein - result.food1.protein).toFixed(1)}g more protein.`
+                }
+              </div>
+            )}
           </div>
         )}
       </div>

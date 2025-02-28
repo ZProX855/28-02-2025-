@@ -1,12 +1,9 @@
 
-// This is a mock API service that simulates the integration with Google Gemini API
-// In a real application, this would be handled via a secure backend to protect API keys
+// API service with Gemini 1.5 Flash integration
 
-interface AIResponse {
-  text: string;
-  loading: boolean;
-  error: string | null;
-}
+// Use this API key for the Gemini AI model
+const GEMINI_API_KEY = "AIzaSyDmoumroXhKpFdcPBqhrw6W6F_PZp--LMI";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Mock food database
 export const foodDatabase = {
@@ -58,154 +55,363 @@ export const getAllFoods = () => {
   return allCategories.flat();
 };
 
-// Mock AI Nutrition Assistant responses
-export const getChatResponse = async (message: string): Promise<AIResponse> => {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Generate a contextual response based on the message
-      let response = '';
-      
-      if (message.toLowerCase().includes('calorie') || message.toLowerCase().includes('calories')) {
-        response = "🍎 Calories are just one part of nutrition! Focus on nutrient-dense foods rather than just calorie counting.\n\n• Whole foods generally provide more nutrients than processed ones\n• Protein and fiber help you feel full longer\n• Healthy fats are essential for brain health\n\nRecommendation: Track food quality, not just quantity! 🥑";
-      } else if (message.toLowerCase().includes('protein')) {
-        response = "💪 Protein is essential for muscle repair and growth!\n\n• Aim for 0.8-1g per kg of body weight daily\n• Include variety of sources: animal and plant-based\n• Spread intake throughout the day for optimal absorption\n\nRecommendation: Add a protein source to each meal! 🥚🐟🥜";
-      } else if (message.toLowerCase().includes('weight loss') || message.toLowerCase().includes('lose weight')) {
-        response = "⚖️ Sustainable weight loss is about lifestyle changes, not quick fixes!\n\n• Create a moderate calorie deficit (300-500 calories/day)\n• Increase protein intake to preserve muscle mass\n• Stay hydrated and get enough sleep\n• Regular physical activity is key\n\nRecommendation: Focus on progress, not perfection! 🌱";
-      } else if (message.toLowerCase().includes('carb') || message.toLowerCase().includes('carbs')) {
-        response = "🍚 Carbohydrates are your body's primary energy source!\n\n• Choose complex carbs like whole grains, fruits and vegetables\n• Fiber-rich carbs help regulate blood sugar\n• Timing carbs around workouts can improve performance\n\nRecommendation: Don't fear carbs - choose quality sources! 🍠🍎";
-      } else {
-        response = "🥦 Balanced nutrition is key to overall wellness!\n\n• Eat a rainbow of colorful vegetables and fruits daily\n• Stay hydrated with water as your primary beverage\n• Include a balance of protein, healthy fats, and complex carbs\n• Mindful eating helps prevent overeating\n\nRecommendation: Small, consistent habits lead to big results! 💧🥗";
-      }
-      
-      resolve({
-        text: response,
-        loading: false,
-        error: null
-      });
-    }, 1000); // Simulate network delay
-  });
-};
-
-// Mock food comparison function
-export const compareFoods = async (food1: string, food2: string, quantity1: number = 100, quantity2: number = 100) => {
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const allFoods = getAllFoods();
-      const food1Data = allFoods.find(food => food.name.toLowerCase() === food1.toLowerCase());
-      const food2Data = allFoods.find(food => food.name.toLowerCase() === food2.toLowerCase());
-      
-      if (!food1Data || !food2Data) {
-        resolve({
-          error: "One or both foods not found in our database",
-          data: null
-        });
-        return;
-      }
-      
-      // Adjust for quantity
-      const food1Adjusted = {
-        name: food1Data.name,
-        calories: (food1Data.calories * quantity1) / 100,
-        protein: (food1Data.protein * quantity1) / 100,
-        fats: (food1Data.fats * quantity1) / 100,
-        carbs: (food1Data.carbs * quantity1) / 100,
-        fiber: (food1Data.fiber * quantity1) / 100,
-      };
-      
-      const food2Adjusted = {
-        name: food2Data.name,
-        calories: (food2Data.calories * quantity2) / 100,
-        protein: (food2Data.protein * quantity2) / 100,
-        fats: (food2Data.fats * quantity2) / 100,
-        carbs: (food2Data.carbs * quantity2) / 100,
-        fiber: (food2Data.fiber * quantity2) / 100,
-      };
-      
-      resolve({
-        error: null,
-        data: {
-          food1: food1Adjusted,
-          food2: food2Adjusted
+// Helper function for Gemini API calls
+async function callGeminiAPI(prompt: string, temperature: number = 0.5, isVision: boolean = false, imageData?: string) {
+  try {
+    const model = isVision ? "gemini-1.5-vision" : "gemini-1.5-flash";
+    const url = `${GEMINI_API_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    
+    let requestBody: any = {
+      contents: [
+        {
+          parts: [
+            { text: prompt }
+          ]
+        }
+      ],
+      temperature: temperature
+    };
+    
+    // Add image data for vision model if provided
+    if (isVision && imageData) {
+      requestBody.contents[0].parts.unshift({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: imageData.split(',')[1] // Remove the data:image/jpeg;base64, part
         }
       });
-    }, 1000); // Simulate network delay
-  });
+    }
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    throw error;
+  }
+}
+
+// AI Nutrition Assistant chat function
+export const getChatResponse = async (message: string) => {
+  try {
+    const prompt = `
+      You are a friendly AI nutrition assistant. 
+      The user is asking: "${message}"
+      
+      Please provide a short, clear, and engaging response about nutrition. 
+      Use bullet points and emojis where appropriate. 
+      Keep your response concise and end with a quick recommendation.
+    `;
+    
+    const aiResponse = await callGeminiAPI(prompt);
+    
+    return {
+      text: aiResponse,
+      loading: false,
+      error: null
+    };
+  } catch (error) {
+    console.error("Chat API error:", error);
+    return {
+      text: "I'm sorry, I couldn't process your request right now. Please try again later.",
+      loading: false,
+      error: "API error"
+    };
+  }
 };
 
-// Mock BMI calculator and advice
-export const calculateBMI = (height: number, weight: number) => {
-  // Height in meters, weight in kg
+// Food comparison function with AI insights
+export const compareFoods = async (food1: string, food2: string, quantity1: number = 100, quantity2: number = 100) => {
+  // First get the basic nutrition data from our database
+  const allFoods = getAllFoods();
+  const food1Data = allFoods.find(food => food.name.toLowerCase() === food1.toLowerCase());
+  const food2Data = allFoods.find(food => food.name.toLowerCase() === food2.toLowerCase());
+  
+  if (!food1Data || !food2Data) {
+    return {
+      error: "One or both foods not found in our database",
+      data: null
+    };
+  }
+  
+  // Adjust for quantity
+  const food1Adjusted = {
+    name: food1Data.name,
+    calories: (food1Data.calories * quantity1) / 100,
+    protein: (food1Data.protein * quantity1) / 100,
+    fats: (food1Data.fats * quantity1) / 100,
+    carbs: (food1Data.carbs * quantity1) / 100,
+    fiber: (food1Data.fiber * quantity1) / 100,
+  };
+  
+  const food2Adjusted = {
+    name: food2Data.name,
+    calories: (food2Data.calories * quantity2) / 100,
+    protein: (food2Data.protein * quantity2) / 100,
+    fats: (food2Data.fats * quantity2) / 100,
+    carbs: (food2Data.carbs * quantity2) / 100,
+    fiber: (food2Data.fiber * quantity2) / 100,
+  };
+  
+  try {
+    // Get AI insights on the comparison
+    const prompt = `
+      Compare the nutritional values of ${quantity1}g ${food1} vs ${quantity2}g ${food2}:
+      
+      ${food1} (${quantity1}g):
+      - Calories: ${food1Adjusted.calories.toFixed(1)} kcal
+      - Protein: ${food1Adjusted.protein.toFixed(1)}g
+      - Fats: ${food1Adjusted.fats.toFixed(1)}g
+      - Carbs: ${food1Adjusted.carbs.toFixed(1)}g
+      - Fiber: ${food1Adjusted.fiber.toFixed(1)}g
+      
+      ${food2} (${quantity2}g):
+      - Calories: ${food2Adjusted.calories.toFixed(1)} kcal
+      - Protein: ${food2Adjusted.protein.toFixed(1)}g
+      - Fats: ${food2Adjusted.fats.toFixed(1)}g
+      - Carbs: ${food2Adjusted.carbs.toFixed(1)}g
+      - Fiber: ${food2Adjusted.fiber.toFixed(1)}g
+      
+      Provide a concise comparative analysis and highlight key nutritional differences.
+    `;
+    
+    const aiInsights = await callGeminiAPI(prompt);
+    
+    return {
+      error: null,
+      data: {
+        food1: food1Adjusted,
+        food2: food2Adjusted,
+        insights: aiInsights
+      }
+    };
+  } catch (error) {
+    console.error("Food comparison API error:", error);
+    return {
+      error: "Failed to get AI insights",
+      data: {
+        food1: food1Adjusted,
+        food2: food2Adjusted,
+        insights: null
+      }
+    };
+  }
+};
+
+// BMI calculator and advice
+export const calculateBMI = async (height: number, weight: number) => {
+  // Calculate BMI
   const bmi = weight / ((height/100) * (height/100));
+  const bmiValue = bmi.toFixed(1);
   
   let category = '';
-  let advice = '';
   
   if (bmi < 18.5) {
     category = 'Underweight';
-    advice = "🥗 Focus on nutrient-dense foods to help you gain weight in a healthy way. Include healthy fats like avocados, nuts, and olive oil. Strength training can help build muscle mass. Consider smaller, more frequent meals if you struggle with appetite.";
   } else if (bmi >= 18.5 && bmi < 25) {
     category = 'Normal weight';
-    advice = "🌟 You're in a healthy weight range! Focus on maintaining balanced nutrition with plenty of whole foods. Regular physical activity will help maintain muscle mass and cardiovascular health. Stay hydrated and prioritize quality sleep.";
   } else if (bmi >= 25 && bmi < 30) {
     category = 'Overweight';
-    advice = "🚶 Gradual changes to diet and increasing physical activity can help. Focus on whole foods, adequate protein, and plenty of vegetables. Even small amounts of daily movement can make a difference. Staying hydrated can help manage hunger.";
   } else {
     category = 'Obese';
-    advice = "💪 Start with small, sustainable changes rather than drastic diets. Increasing protein and fiber can help manage hunger. Regular movement, even just walking, is beneficial. Consider consulting a healthcare provider for personalized guidance.";
   }
   
-  return {
-    bmi: bmi.toFixed(1),
-    category,
-    advice
-  };
+  try {
+    // Get AI-generated advice based on BMI
+    const prompt = `
+      A user has a BMI of ${bmiValue}, which puts them in the ${category} category.
+      Provide a short, friendly, and actionable advice for this person.
+      Focus on practical tips that are realistic and sustainable.
+      Include information about nutrition, physical activity, and overall wellness.
+      Keep your response concise (around 150 words).
+      Use emojis to make your response more engaging.
+    `;
+    
+    const advice = await callGeminiAPI(prompt);
+    
+    return {
+      bmi: bmiValue,
+      category,
+      advice
+    };
+  } catch (error) {
+    console.error("BMI advice API error:", error);
+    
+    // Fallback advice if API fails
+    let fallbackAdvice = '';
+    
+    if (bmi < 18.5) {
+      fallbackAdvice = "🥗 Focus on nutrient-dense foods to help you gain weight in a healthy way. Include healthy fats like avocados, nuts, and olive oil. Strength training can help build muscle mass. Consider smaller, more frequent meals if you struggle with appetite.";
+    } else if (bmi >= 18.5 && bmi < 25) {
+      fallbackAdvice = "🌟 You're in a healthy weight range! Focus on maintaining balanced nutrition with plenty of whole foods. Regular physical activity will help maintain muscle mass and cardiovascular health. Stay hydrated and prioritize quality sleep.";
+    } else if (bmi >= 25 && bmi < 30) {
+      fallbackAdvice = "🚶 Gradual changes to diet and increasing physical activity can help. Focus on whole foods, adequate protein, and plenty of vegetables. Even small amounts of daily movement can make a difference. Staying hydrated can help manage hunger.";
+    } else {
+      fallbackAdvice = "💪 Start with small, sustainable changes rather than drastic diets. Increasing protein and fiber can help manage hunger. Regular movement, even just walking, is beneficial. Consider consulting a healthcare provider for personalized guidance.";
+    }
+    
+    return {
+      bmi: bmiValue,
+      category,
+      advice: fallbackAdvice
+    };
+  }
 };
 
-// Mock meal recognition function
-export const recognizeMeal = async (imageUrl: string) => {
-  // In a real app, this would call the Gemini Vision API with the image
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // For demo purposes, return a mock response
-      resolve({
-        foodIdentified: "Grilled Salmon with Quinoa and Vegetables",
-        nutritionInfo: {
-          calories: 420,
-          protein: 32,
-          carbs: 30,
-          fats: 15,
-          fiber: 6
-        },
-        recommendations: "🐟 Great choice with the salmon - rich in omega-3 fatty acids!\n\n• The balance of protein, complex carbs, and vegetables makes this a nutritionally complete meal\n• Consider adding a small side of leafy greens for more vitamins\n• This meal supports both muscle maintenance and provides sustained energy\n\nRecommendation: This is an excellent meal choice that supports overall health!"
-      });
-    }, 1500); // Simulate network delay
-  });
-};
-
-// Mock wellness journey function
-export const getWellnessInsights = async (goals: string[]) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const insights = {
-        recommendations: [
-          "Start with small, achievable daily habits",
-          "Track your progress with measurements beyond the scale",
-          "Focus on how foods make you feel, not just calories",
-          "Include strength training alongside cardio for better results",
-          "Prioritize sleep quality for better recovery and reduced cravings"
-        ],
-        milestones: [
-          "Week 1-2: Notice improved energy levels",
-          "Week 3-4: Feel stronger during workouts",
-          "Week 6-8: Clothes fit differently",
-          "Month 3: Significant habit changes established",
-          "Month 6: Major progress toward your goals"
-        ]
+// Meal recognition function with AI vision model
+export const recognizeMeal = async (imageData: string) => {
+  try {
+    const prompt = `
+      Analyze this food image and provide:
+      1. A detailed identification of what's in the meal
+      2. Estimated nutritional breakdown (calories, protein, carbs, fats, and fiber)
+      3. Short, actionable dietary recommendations based on this meal
+      
+      Format the response in a structured way with clear sections for identification, nutrition information, and recommendations.
+      Use emojis and bullet points to make the information easy to scan.
+    `;
+    
+    const aiResponse = await callGeminiAPI(prompt, 0.5, true, imageData);
+    
+    // Parse the AI response to extract structured information
+    // This is a simplified parsing - in a real app, you might want more robust parsing
+    const sections = aiResponse.split('\n\n');
+    
+    let foodIdentified = "Unknown meal";
+    let nutritionInfo = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fats: 0,
+      fiber: 0
+    };
+    let recommendations = "No recommendations available";
+    
+    if (sections.length >= 3) {
+      foodIdentified = sections[0].trim();
+      
+      // Extract nutrition info from the second section
+      const nutritionText = sections[1];
+      const caloriesMatch = nutritionText.match(/calories:?\s*(\d+)/i);
+      const proteinMatch = nutritionText.match(/protein:?\s*(\d+)/i);
+      const carbsMatch = nutritionText.match(/carbs:?\s*(\d+)/i);
+      const fatsMatch = nutritionText.match(/fats:?\s*(\d+)/i);
+      const fiberMatch = nutritionText.match(/fiber:?\s*(\d+)/i);
+      
+      nutritionInfo = {
+        calories: caloriesMatch ? parseInt(caloriesMatch[1]) : 0,
+        protein: proteinMatch ? parseInt(proteinMatch[1]) : 0,
+        carbs: carbsMatch ? parseInt(carbsMatch[1]) : 0,
+        fats: fatsMatch ? parseInt(fatsMatch[1]) : 0,
+        fiber: fiberMatch ? parseInt(fiberMatch[1]) : 0
       };
       
-      resolve(insights);
-    }, 1000);
-  });
+      recommendations = sections[2].trim();
+    }
+    
+    return {
+      foodIdentified,
+      nutritionInfo,
+      recommendations
+    };
+  } catch (error) {
+    console.error("Meal recognition API error:", error);
+    
+    // Return fallback data if the API call fails
+    return {
+      foodIdentified: "Could not identify the meal",
+      nutritionInfo: {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
+      },
+      recommendations: "We couldn't analyze your meal. Please try again with a clearer image."
+    };
+  }
+};
+
+// Wellness journey insights function
+export interface WellnessInsights {
+  recommendations: string[];
+  milestones: string[];
+}
+
+export const getWellnessInsights = async (goals: string[]): Promise<WellnessInsights> => {
+  try {
+    const prompt = `
+      The user has selected the following wellness goals:
+      ${goals.map(goal => `- ${goal}`).join('\n')}
+      
+      Based on these goals, provide:
+      1. 5 actionable recommendations to help them achieve these goals
+      2. 5 milestones they can expect to see on their journey
+      
+      Format your response as a JSON object with two arrays: "recommendations" and "milestones".
+      Each recommendation and milestone should be a string.
+    `;
+    
+    const aiResponse = await callGeminiAPI(prompt);
+    
+    try {
+      // Try to parse the response as JSON
+      const parsedResponse = JSON.parse(aiResponse);
+      return {
+        recommendations: Array.isArray(parsedResponse.recommendations) ? parsedResponse.recommendations : [],
+        milestones: Array.isArray(parsedResponse.milestones) ? parsedResponse.milestones : []
+      };
+    } catch (parseError) {
+      console.error("Failed to parse AI response as JSON:", parseError);
+      
+      // Fallback: Try to extract recommendations and milestones from text
+      const recommendationsMatch = aiResponse.match(/recommendations:?\s*\n((?:- [^\n]+\n?)+)/i);
+      const milestonesMatch = aiResponse.match(/milestones:?\s*\n((?:- [^\n]+\n?)+)/i);
+      
+      const recommendations = recommendationsMatch ? 
+        recommendationsMatch[1].split('\n')
+          .filter(line => line.trim().startsWith('- '))
+          .map(line => line.trim().substring(2)) : 
+        [];
+      
+      const milestones = milestonesMatch ? 
+        milestonesMatch[1].split('\n')
+          .filter(line => line.trim().startsWith('- '))
+          .map(line => line.trim().substring(2)) : 
+        [];
+      
+      return { recommendations, milestones };
+    }
+  } catch (error) {
+    console.error("Wellness insights API error:", error);
+    
+    // Return fallback data if the API call fails
+    return {
+      recommendations: [
+        "Start with small, achievable daily habits",
+        "Track your progress with measurements beyond the scale",
+        "Focus on how foods make you feel, not just calories",
+        "Include strength training alongside cardio for better results",
+        "Prioritize sleep quality for better recovery and reduced cravings"
+      ],
+      milestones: [
+        "Week 1-2: Notice improved energy levels",
+        "Week 3-4: Feel stronger during workouts",
+        "Week 6-8: Clothes fit differently",
+        "Month 3: Significant habit changes established",
+        "Month 6: Major progress toward your goals"
+      ]
+    };
+  }
 };

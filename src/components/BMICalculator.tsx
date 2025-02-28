@@ -14,9 +14,10 @@ const BMICalculator: React.FC = () => {
   const [height, setHeight] = useState<number | ''>('');
   const [weight, setWeight] = useState<number | ''>('');
   const [result, setResult] = useState<BMIResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [animateResult, setAnimateResult] = useState(false);
 
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     if (height === '' || weight === '') {
       toast.error('Please enter both height and weight');
       return;
@@ -28,13 +29,24 @@ const BMICalculator: React.FC = () => {
         return;
       }
       
+      setIsLoading(true);
       setAnimateResult(false);
-      // Small delay for animation effect when recalculating
-      setTimeout(() => {
-        const bmiResult = calculateBMI(height, weight);
-        setResult(bmiResult);
-        setAnimateResult(true);
-      }, 100);
+      
+      try {
+        // Call the API to get BMI calculation and AI-generated advice
+        const bmiResult = await calculateBMI(height, weight);
+        
+        // Small delay for animation effect
+        setTimeout(() => {
+          setResult(bmiResult);
+          setAnimateResult(true);
+          setIsLoading(false);
+        }, 300);
+      } catch (error) {
+        console.error("BMI calculation error:", error);
+        toast.error("Failed to calculate BMI. Please try again.");
+        setIsLoading(false);
+      }
     }
   };
 
@@ -94,6 +106,7 @@ const BMICalculator: React.FC = () => {
             placeholder="Enter height in cm"
             className="input-field w-full"
             min="0"
+            disabled={isLoading}
           />
         </div>
         <div className="flex-1">
@@ -105,16 +118,27 @@ const BMICalculator: React.FC = () => {
             placeholder="Enter weight in kg"
             className="input-field w-full"
             min="0"
+            disabled={isLoading}
           />
         </div>
       </div>
       
       <button
         onClick={handleCalculate}
+        disabled={isLoading}
         className="btn-primary rounded-lg w-full mb-6 flex items-center justify-center gap-2"
       >
-        <HeartPulse className="h-5 w-5" />
-        Calculate BMI
+        {isLoading ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            Calculating...
+          </>
+        ) : (
+          <>
+            <HeartPulse className="h-5 w-5" />
+            Calculate BMI
+          </>
+        )}
       </button>
       
       {renderBMIScale()}
