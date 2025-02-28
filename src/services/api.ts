@@ -1,11 +1,11 @@
 
-// API service with Gemini 1.5 Flash integration
+// API service with Gemini 2.0 Flash integration
 
 // Use this API key for the Gemini AI model
-const GEMINI_API_KEY = "AIzaSyDmoumroXhKpFdcPBqhrw6W6F_PZp--LMI";
+const GEMINI_API_KEY = "AIzaSyC3Er0jxIvcQCjPzGpp9xYH-Lc-8TuqqJc";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
-// Mock food database
+// Mock food database (USDA-based data)
 export const foodDatabase = {
   proteins: [
     { name: 'Chicken Breast', calories: 165, protein: 31, fats: 3.6, carbs: 0, fiber: 0 },
@@ -14,6 +14,10 @@ export const foodDatabase = {
     { name: 'Salmon', calories: 206, protein: 22, fats: 13, carbs: 0, fiber: 0 },
     { name: 'Lentils', calories: 116, protein: 9, fats: 0.4, carbs: 20, fiber: 8 },
     { name: 'Eggs', calories: 155, protein: 13, fats: 11, carbs: 1, fiber: 0 },
+    { name: 'Tuna', calories: 130, protein: 29, fats: 1, carbs: 0, fiber: 0 },
+    { name: 'Greek Yogurt', calories: 100, protein: 10, fats: 5, carbs: 3.6, fiber: 0 },
+    { name: 'Cottage Cheese', calories: 98, protein: 11, fats: 4.3, carbs: 3.1, fiber: 0 },
+    { name: 'Turkey Breast', calories: 135, protein: 30, fats: 1, carbs: 0, fiber: 0 },
   ],
   carbs: [
     { name: 'White Rice', calories: 130, protein: 2.7, fats: 0.3, carbs: 28, fiber: 0.4 },
@@ -22,6 +26,10 @@ export const foodDatabase = {
     { name: 'Whole Grain Bread', calories: 69, protein: 3.6, fats: 1, carbs: 12, fiber: 1.9 },
     { name: 'Pasta', calories: 158, protein: 5.8, fats: 0.9, carbs: 31, fiber: 1.8 },
     { name: 'Sweet Potato', calories: 86, protein: 1.6, fats: 0.1, carbs: 20, fiber: 3 },
+    { name: 'Potato', calories: 77, protein: 2, fats: 0.1, carbs: 17, fiber: 2.2 },
+    { name: 'Brown Rice', calories: 112, protein: 2.6, fats: 0.9, carbs: 23.5, fiber: 1.8 },
+    { name: 'Corn', calories: 96, protein: 3.4, fats: 1.5, carbs: 21, fiber: 2.4 },
+    { name: 'Barley', calories: 123, protein: 2.3, fats: 0.8, carbs: 28.2, fiber: 3.8 },
   ],
   fats: [
     { name: 'Avocado', calories: 160, protein: 2, fats: 15, carbs: 9, fiber: 7 },
@@ -30,6 +38,10 @@ export const foodDatabase = {
     { name: 'Butter', calories: 717, protein: 0.9, fats: 81, carbs: 0.1, fiber: 0 },
     { name: 'Olive Oil', calories: 884, protein: 0, fats: 100, carbs: 0, fiber: 0 },
     { name: 'Peanut Butter', calories: 588, protein: 25, fats: 50, carbs: 20, fiber: 6 },
+    { name: 'Walnuts', calories: 654, protein: 15.2, fats: 65.2, carbs: 13.7, fiber: 6.7 },
+    { name: 'Coconut Oil', calories: 862, protein: 0, fats: 100, carbs: 0, fiber: 0 },
+    { name: 'Chia Seeds', calories: 486, protein: 16.5, fats: 30.7, carbs: 42.1, fiber: 34.4 },
+    { name: 'Flax Seeds', calories: 534, protein: 18.3, fats: 42.2, carbs: 28.9, fiber: 27.3 },
   ],
   fruits: [
     { name: 'Banana', calories: 89, protein: 1.1, fats: 0.3, carbs: 23, fiber: 2.6 },
@@ -38,6 +50,10 @@ export const foodDatabase = {
     { name: 'Mango', calories: 60, protein: 0.8, fats: 0.4, carbs: 15, fiber: 1.6 },
     { name: 'Blueberries', calories: 57, protein: 0.7, fats: 0.3, carbs: 14, fiber: 2.4 },
     { name: 'Orange', calories: 47, protein: 0.9, fats: 0.1, carbs: 12, fiber: 2.4 },
+    { name: 'Pineapple', calories: 50, protein: 0.5, fats: 0.1, carbs: 13.1, fiber: 1.4 },
+    { name: 'Grapes', calories: 69, protein: 0.7, fats: 0.2, carbs: 18.1, fiber: 0.9 },
+    { name: 'Watermelon', calories: 30, protein: 0.6, fats: 0.2, carbs: 7.6, fiber: 0.4 },
+    { name: 'Kiwi', calories: 61, protein: 1.1, fats: 0.5, carbs: 14.7, fiber: 3 },
   ],
   vegetables: [
     { name: 'Spinach', calories: 23, protein: 2.9, fats: 0.4, carbs: 3.6, fiber: 2.2 },
@@ -46,6 +62,34 @@ export const foodDatabase = {
     { name: 'Bell Peppers', calories: 31, protein: 1, fats: 0.3, carbs: 6, fiber: 2.1 },
     { name: 'Kale', calories: 49, protein: 4.3, fats: 0.9, carbs: 8.8, fiber: 3.6 },
     { name: 'Cauliflower', calories: 25, protein: 1.9, fats: 0.3, carbs: 5, fiber: 2 },
+    { name: 'Tomatoes', calories: 18, protein: 0.9, fats: 0.2, carbs: 3.9, fiber: 1.2 },
+    { name: 'Cucumber', calories: 15, protein: 0.7, fats: 0.1, carbs: 3.6, fiber: 0.5 },
+    { name: 'Zucchini', calories: 17, protein: 1.2, fats: 0.3, carbs: 3.1, fiber: 1 },
+    { name: 'Mushrooms', calories: 22, protein: 3.1, fats: 0.3, carbs: 3.3, fiber: 1 },
+  ],
+  grains_legumes: [
+    { name: 'Black Beans', calories: 132, protein: 8.9, fats: 0.5, carbs: 23.7, fiber: 8.7 },
+    { name: 'Chickpeas', calories: 164, protein: 8.9, fats: 2.6, carbs: 27.4, fiber: 7.6 },
+    { name: 'Pinto Beans', calories: 143, protein: 9, fats: 0.7, carbs: 26.2, fiber: 9 },
+    { name: 'Kidney Beans', calories: 127, protein: 8.7, fats: 0.5, carbs: 22.8, fiber: 6.4 },
+    { name: 'Couscous', calories: 112, protein: 3.8, fats: 0.2, carbs: 23.2, fiber: 1.4 },
+    { name: 'Bulgur', calories: 83, protein: 3.1, fats: 0.2, carbs: 18.6, fiber: 4.5 },
+    { name: 'Millet', calories: 119, protein: 3.5, fats: 1, carbs: 23.7, fiber: 2.3 },
+    { name: 'Amaranth', calories: 103, protein: 3.8, fats: 1.8, carbs: 18.7, fiber: 2.8 },
+    { name: 'Buckwheat', calories: 92, protein: 3.4, fats: 0.8, carbs: 19.9, fiber: 2.7 },
+    { name: 'Spelt', calories: 127, protein: 5.5, fats: 0.8, carbs: 26.3, fiber: 2.7 },
+  ],
+  dairy: [
+    { name: 'Milk (Whole)', calories: 61, protein: 3.2, fats: 3.3, carbs: 4.8, fiber: 0 },
+    { name: 'Milk (Skim)', calories: 34, protein: 3.4, fats: 0.1, carbs: 5, fiber: 0 },
+    { name: 'Yogurt (Plain)', calories: 59, protein: 3.5, fats: 3.3, carbs: 4.7, fiber: 0 },
+    { name: 'Feta Cheese', calories: 264, protein: 14.2, fats: 21.3, carbs: 4.1, fiber: 0 },
+    { name: 'Mozzarella', calories: 280, protein: 28, fats: 17, carbs: 3.1, fiber: 0 },
+    { name: 'Cream Cheese', calories: 342, protein: 6.2, fats: 34, carbs: 2.7, fiber: 0 },
+    { name: 'Sour Cream', calories: 198, protein: 3, fats: 19.4, carbs: 4.6, fiber: 0 },
+    { name: 'Parmesan Cheese', calories: 431, protein: 38.5, fats: 29, carbs: 3.2, fiber: 0 },
+    { name: 'Goat Cheese', calories: 364, protein: 21.6, fats: 29.8, carbs: 0.9, fiber: 0 },
+    { name: 'Swiss Cheese', calories: 380, protein: 27, fats: 28, carbs: 5.4, fiber: 0 },
   ]
 };
 
@@ -58,7 +102,7 @@ export const getAllFoods = () => {
 // Helper function for Gemini API calls
 async function callGeminiAPI(prompt: string, temperature: number = 0.5, isVision: boolean = false, imageData?: string) {
   try {
-    const model = isVision ? "gemini-1.5-vision" : "gemini-1.5-flash";
+    const model = isVision ? "gemini-1.5-vision" : "gemini-2.0-flash";
     const url = `${GEMINI_API_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`;
     
     let requestBody: any = {
@@ -112,6 +156,10 @@ export const getChatResponse = async (message: string) => {
       Please provide a short, clear, and engaging response about nutrition. 
       Use bullet points and emojis where appropriate. 
       Keep your response concise and end with a quick recommendation.
+      
+      If the user asks for a meal plan or specific nutritional advice, include sample foods with their nutritional values.
+      If they ask about weight management, provide practical tips based on scientific evidence.
+      If they ask about specific diets (keto, paleo, vegan, etc.), provide a balanced view of benefits and considerations.
     `;
     
     const aiResponse = await callGeminiAPI(prompt);
@@ -183,7 +231,13 @@ export const compareFoods = async (food1: string, food2: string, quantity1: numb
       - Carbs: ${food2Adjusted.carbs.toFixed(1)}g
       - Fiber: ${food2Adjusted.fiber.toFixed(1)}g
       
-      Provide a concise comparative analysis and highlight key nutritional differences.
+      Provide a detailed comparative analysis of these foods including:
+      1. Which food is more nutrient-dense and why
+      2. How each food might fit into different dietary goals (weight loss, muscle building, general health)
+      3. Which vitamins and minerals these foods are likely to contain based on their profiles
+      4. Practical recommendations for how to incorporate these foods into a balanced diet
+      
+      Format your response in clear paragraphs with helpful comparisons.
     `;
     
     const aiInsights = await callGeminiAPI(prompt);
@@ -231,11 +285,16 @@ export const calculateBMI = async (height: number, weight: number) => {
     // Get AI-generated advice based on BMI
     const prompt = `
       A user has a BMI of ${bmiValue}, which puts them in the ${category} category.
-      Provide a short, friendly, and actionable advice for this person.
-      Focus on practical tips that are realistic and sustainable.
-      Include information about nutrition, physical activity, and overall wellness.
-      Keep your response concise (around 150 words).
-      Use emojis to make your response more engaging.
+      
+      Provide personalized advice that includes:
+      1. A friendly and non-judgmental assessment of their current BMI
+      2. 3-5 specific, actionable nutrition recommendations appropriate for their BMI category
+      3. 2-3 appropriate physical activity suggestions
+      4. Information about how their current BMI might impact health
+      5. A realistic timeline for healthy changes if needed
+      
+      Make your response engaging with emojis, motivational but realistic, and focused on overall health rather than just weight.
+      Keep your response concise (around 200-250 words).
     `;
     
     const advice = await callGeminiAPI(prompt);
@@ -273,19 +332,34 @@ export const calculateBMI = async (height: number, weight: number) => {
 export const recognizeMeal = async (imageData: string) => {
   try {
     const prompt = `
-      Analyze this food image and provide:
-      1. A detailed identification of what's in the meal
-      2. Estimated nutritional breakdown (calories, protein, carbs, fats, and fiber)
-      3. Short, actionable dietary recommendations based on this meal
+      You are a professional nutritionist analyzing a food image. Please provide:
       
-      Format the response in a structured way with clear sections for identification, nutrition information, and recommendations.
-      Use emojis and bullet points to make the information easy to scan.
+      1. Detailed identification: What foods are in this meal? List all visible ingredients and components.
+      
+      2. Nutritional breakdown: Provide estimated values for:
+         - Calories (total for the meal)
+         - Protein (g)
+         - Carbs (g) 
+         - Fats (g)
+         - Fiber (g)
+         - Key vitamins and minerals present
+      
+      3. Dietary analysis:
+         - Is this meal balanced? Why or why not?
+         - Which food groups are represented?
+         - What might be missing for optimal nutrition?
+      
+      4. Personalized recommendations:
+         - How could this meal be optimized for better nutrition?
+         - Suggest 2-3 simple modifications to improve nutritional value
+         - Who might this meal be particularly suitable for? (athletes, weight loss, etc.)
+      
+      Format your response clearly with headings and concise bullet points. Use emojis where appropriate.
     `;
     
     const aiResponse = await callGeminiAPI(prompt, 0.5, true, imageData);
     
     // Parse the AI response to extract structured information
-    // This is a simplified parsing - in a real app, you might want more robust parsing
     const sections = aiResponse.split('\n\n');
     
     let foodIdentified = "Unknown meal";
@@ -323,7 +397,8 @@ export const recognizeMeal = async (imageData: string) => {
     return {
       foodIdentified,
       nutritionInfo,
-      recommendations
+      recommendations,
+      fullAnalysis: aiResponse
     };
   } catch (error) {
     console.error("Meal recognition API error:", error);
@@ -338,7 +413,8 @@ export const recognizeMeal = async (imageData: string) => {
         fats: 0,
         fiber: 0
       },
-      recommendations: "We couldn't analyze your meal. Please try again with a clearer image."
+      recommendations: "We couldn't analyze your meal. Please try again with a clearer image.",
+      fullAnalysis: null
     };
   }
 };
@@ -355,12 +431,23 @@ export const getWellnessInsights = async (goals: string[]): Promise<WellnessInsi
       The user has selected the following wellness goals:
       ${goals.map(goal => `- ${goal}`).join('\n')}
       
-      Based on these goals, provide:
-      1. 5 actionable recommendations to help them achieve these goals
-      2. 5 milestones they can expect to see on their journey
+      Based on these specific goals, create a comprehensive wellness plan that includes:
       
-      Format your response as a JSON object with two arrays: "recommendations" and "milestones".
-      Each recommendation and milestone should be a string.
+      1. 6 actionable, specific recommendations to help them achieve these goals
+         - Each recommendation should be practical and implementable
+         - Include a mix of nutrition, fitness, and lifestyle suggestions
+         - For nutrition recommendations, mention specific foods and their benefits
+      
+      2. 5 realistic milestones they can expect to see throughout their journey
+         - Provide a timeline for each milestone (e.g., "Week 1-2", "Month 3")
+         - Include both physical and mental/emotional milestones
+         - Explain why each milestone matters for long-term success
+      
+      FORMAT YOUR RESPONSE AS A JSON OBJECT with two arrays:
+      {
+        "recommendations": ["Recommendation 1", "Recommendation 2", ...],
+        "milestones": ["Milestone 1", "Milestone 2", ...]
+      }
     `;
     
     const aiResponse = await callGeminiAPI(prompt);

@@ -1,20 +1,21 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Dumbbell, Coffee, Heart } from 'lucide-react';
+import { Send, Dumbbell, Coffee, Heart, Leaf, Apple } from 'lucide-react';
 import { getChatResponse } from '../services/api';
 import { toast } from 'sonner';
 
 const AIChat: React.FC = () => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([
-    { text: "👋 Hi there! I'm your friendly AI nutrition assistant. Ask me anything about nutrition, diet, or wellness!", isUser: false }
+    { text: "👋 Hi there! I'm your friendly AI nutrition assistant powered by Gemini 2.0. Ask me anything about nutrition, diet, or wellness!", isUser: false }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const suggestionTopics = [
     { text: "How much protein do I need daily?", icon: <Dumbbell className="h-4 w-4" /> },
-    { text: "What's better: coffee or tea?", icon: <Coffee className="h-4 w-4" /> },
+    { text: "What foods help reduce inflammation?", icon: <Leaf className="h-4 w-4" /> },
+    { text: "Healthiest breakfast options?", icon: <Apple className="h-4 w-4" /> },
     { text: "Tips for heart-healthy eating", icon: <Heart className="h-4 w-4" /> },
   ];
 
@@ -53,6 +54,7 @@ const AIChat: React.FC = () => {
     <div className="w-full max-w-2xl mx-auto bg-white bg-opacity-80 backdrop-blur-sm shadow-sm rounded-2xl border border-wellness-softGreen/30 overflow-hidden flex flex-col h-[600px]">
       <div className="p-4 bg-wellness-softGreen border-b border-wellness-softGreen/30">
         <h2 className="text-xl font-medium text-wellness-darkGreen">AI Nutrition Assistant</h2>
+        <p className="text-sm text-wellness-charcoal">Powered by Gemini 2.0 Flash</p>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

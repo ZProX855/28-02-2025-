@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { compareFoods, foodDatabase, getAllFoods } from '../services/api';
 import { toast } from 'sonner';
-import { Apple, Carrot, Banana } from 'lucide-react';
+import { Apple, Carrot, Banana, ChevronDown, X, Info } from 'lucide-react';
 
 interface FoodData {
   name: string;
@@ -24,28 +24,23 @@ const FoodComparison: React.FC = () => {
   const [food2, setFood2] = useState('');
   const [quantity1, setQuantity1] = useState(100);
   const [quantity2, setQuantity2] = useState(100);
-  const [searchTerm1, setSearchTerm1] = useState('');
-  const [searchTerm2, setSearchTerm2] = useState('');
-  const [showDropdown1, setShowDropdown1] = useState(false);
-  const [showDropdown2, setShowDropdown2] = useState(false);
+  const [showCategoryDropdown1, setShowCategoryDropdown1] = useState(false);
+  const [showCategoryDropdown2, setShowCategoryDropdown2] = useState(false);
+  const [selectedCategory1, setSelectedCategory1] = useState<string | null>(null);
+  const [selectedCategory2, setSelectedCategory2] = useState<string | null>(null);
+  const [showFoodsDropdown1, setShowFoodsDropdown1] = useState(false);
+  const [showFoodsDropdown2, setShowFoodsDropdown2] = useState(false);
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [foodOptions, setFoodOptions] = useState<string[]>([]);
+  const [foodCategories, setFoodCategories] = useState<string[]>([]);
 
-  // Extract all food names on component mount
+  // Extract all food categories on component mount
   useEffect(() => {
-    const allFoods = getAllFoods();
-    const foodNames = allFoods.map(food => food.name);
-    setFoodOptions(foodNames);
+    const categories = Object.keys(foodDatabase).map(category => 
+      category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    );
+    setFoodCategories(categories);
   }, []);
-
-  // Filter foods based on search term
-  const getFilteredFoods = (searchTerm: string) => {
-    if (!searchTerm) return [];
-    return foodOptions.filter(food => 
-      food.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 5); // Limit to 5 results
-  };
 
   const handleCompare = async () => {
     if (!food1 || !food2) {
@@ -69,14 +64,36 @@ const FoodComparison: React.FC = () => {
     }
   };
 
-  const selectFood = (food: string, field: 'food1' | 'food2') => {
-    if (field === 'food1') {
+  const selectCategory = (category: string, dropdownNumber: 1 | 2) => {
+    if (dropdownNumber === 1) {
+      setSelectedCategory1(category);
+      setShowCategoryDropdown1(false);
+      setShowFoodsDropdown1(true);
+    } else {
+      setSelectedCategory2(category);
+      setShowCategoryDropdown2(false);
+      setShowFoodsDropdown2(true);
+    }
+  };
+
+  const selectFood = (food: string, dropdownNumber: 1 | 2) => {
+    if (dropdownNumber === 1) {
       setFood1(food);
-      setShowDropdown1(false);
+      setShowFoodsDropdown1(false);
     } else {
       setFood2(food);
-      setShowDropdown2(false);
+      setShowFoodsDropdown2(false);
     }
+  };
+
+  const getFoodsInCategory = (categoryName: string | null): FoodData[] => {
+    if (!categoryName) return [];
+    
+    // Convert "Proteins" to "proteins" for object key lookup
+    const categoryKey = categoryName.toLowerCase().replace(' ', '_');
+    
+    // Access foods in the selected category
+    return foodDatabase[categoryKey as keyof typeof foodDatabase] || [];
   };
 
   // Highlight the higher/lower value
@@ -87,27 +104,61 @@ const FoodComparison: React.FC = () => {
     return isBetter ? 'text-green-600 font-medium' : 'text-amber-600';
   };
 
+  const getCategoryIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'proteins':
+        return <img src="https://cdn-icons-png.flaticon.com/512/2531/2531195.png" className="h-5 w-5" alt="Protein" />;
+      case 'carbs':
+        return <img src="https://cdn-icons-png.flaticon.com/512/3076/3076134.png" className="h-5 w-5" alt="Carbs" />;
+      case 'fats':
+        return <img src="https://cdn-icons-png.flaticon.com/512/2413/2413089.png" className="h-5 w-5" alt="Fats" />;
+      case 'fruits':
+        return <Banana className="h-5 w-5 text-amber-500" />;
+      case 'vegetables':
+        return <Carrot className="h-5 w-5 text-orange-500" />;
+      case 'grains legumes':
+        return <img src="https://cdn-icons-png.flaticon.com/512/3823/3823395.png" className="h-5 w-5" alt="Grains" />;
+      case 'dairy':
+        return <img src="https://cdn-icons-png.flaticon.com/512/3050/3050158.png" className="h-5 w-5" alt="Dairy" />;
+      default:
+        return <Apple className="h-5 w-5 text-red-500" />;
+    }
+  };
+
   const renderFoodCategories = () => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {Object.entries(foodDatabase).map(([category, foods], index) => (
-          <div 
-            key={category}
-            className="bg-white bg-opacity-60 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-wellness-softGreen/30 opacity-0 animate-fade-in"
-            style={{ animationDelay: `${index * 150}ms` }}
-          >
-            <h3 className="text-wellness-darkGreen font-medium mb-2 capitalize">{category}</h3>
-            <div className="text-sm text-wellness-charcoal">
-              {foods.slice(0, 4).map((food: FoodData, i: number) => (
-                <div key={i} className="mb-1 flex justify-between">
-                  <span>{food.name}</span>
-                  <span className="text-wellness-darkGreen">{food.calories} cal</span>
-                </div>
-              ))}
-              {foods.length > 4 && <div className="text-xs text-wellness-mediumGreen">+ {foods.length - 4} more</div>}
+        {Object.entries(foodDatabase).map(([category, foods], index) => {
+          const formattedCategory = category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+          return (
+            <div 
+              key={category}
+              className="bg-white bg-opacity-60 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-wellness-softGreen/30 opacity-0 animate-fade-in cursor-pointer hover:border-wellness-mediumGreen transition-colors"
+              style={{ animationDelay: `${index * 150}ms` }}
+              onClick={() => {
+                if (!selectedCategory1) {
+                  selectCategory(formattedCategory, 1);
+                } else if (!selectedCategory2) {
+                  selectCategory(formattedCategory, 2);
+                }
+              }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                {getCategoryIcon(formattedCategory)}
+                <h3 className="text-wellness-darkGreen font-medium capitalize">{formattedCategory}</h3>
+              </div>
+              <div className="text-sm text-wellness-charcoal">
+                {foods.slice(0, 4).map((food: FoodData, i: number) => (
+                  <div key={i} className="mb-1 flex justify-between">
+                    <span>{food.name}</span>
+                    <span className="text-wellness-darkGreen">{food.calories} cal</span>
+                  </div>
+                ))}
+                {foods.length > 4 && <div className="text-xs text-wellness-mediumGreen">+ {foods.length - 4} more</div>}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -115,7 +166,13 @@ const FoodComparison: React.FC = () => {
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Food Categories Display */}
-      {renderFoodCategories()}
+      <div className="p-4 bg-wellness-softGreen/20 rounded-xl mb-6">
+        <h3 className="text-wellness-darkGreen font-medium mb-4 flex items-center gap-2">
+          <Info className="h-5 w-5" />
+          Browse USDA Food Categories
+        </h3>
+        {renderFoodCategories()}
+      </div>
       
       {/* Comparison Tool */}
       <div className="glass-panel p-6">
@@ -124,31 +181,55 @@ const FoodComparison: React.FC = () => {
             <label className="block text-wellness-darkGreen font-medium mb-2">First Food</label>
             <div className="flex gap-3">
               <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={searchTerm1}
-                  onChange={(e) => {
-                    setSearchTerm1(e.target.value);
-                    setShowDropdown1(true);
+                <button
+                  className="input-field w-full text-left flex items-center justify-between"
+                  onClick={() => {
+                    setShowCategoryDropdown1(!showCategoryDropdown1);
+                    setShowFoodsDropdown1(false);
                   }}
-                  placeholder="Search for a food..."
-                  className="input-field w-full"
-                  onFocus={() => setShowDropdown1(true)}
-                />
-                {showDropdown1 && searchTerm1 && (
+                >
+                  <span>{selectedCategory1 || "Select food category"}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+                {showCategoryDropdown1 && (
                   <div className="absolute z-10 mt-1 w-full bg-white border border-wellness-softGreen/50 rounded-lg shadow-lg max-h-60 overflow-auto">
-                    {getFilteredFoods(searchTerm1).length > 0 ? (
-                      getFilteredFoods(searchTerm1).map((food, index) => (
-                        <div
-                          key={index}
-                          className="px-4 py-2 hover:bg-wellness-softGreen/30 cursor-pointer transition-colors"
-                          onClick={() => selectFood(food, 'food1')}
-                        >
-                          {food}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-2 text-wellness-charcoal/70">No foods found</div>
+                    {foodCategories.map((category, index) => (
+                      <div
+                        key={index}
+                        className="px-4 py-2 hover:bg-wellness-softGreen/30 cursor-pointer transition-colors flex items-center gap-2"
+                        onClick={() => selectCategory(category, 1)}
+                      >
+                        {getCategoryIcon(category)}
+                        {category}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {selectedCategory1 && (
+                  <div className="mt-2">
+                    <button
+                      className="input-field w-full text-left flex items-center justify-between"
+                      onClick={() => setShowFoodsDropdown1(!showFoodsDropdown1)}
+                    >
+                      <span>{food1 || "Select food"}</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    {showFoodsDropdown1 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-wellness-softGreen/50 rounded-lg shadow-lg max-h-60 overflow-auto">
+                        {getFoodsInCategory(selectedCategory1).map((food, index) => (
+                          <div
+                            key={index}
+                            className="px-4 py-2 hover:bg-wellness-softGreen/30 cursor-pointer transition-colors"
+                            onClick={() => selectFood(food.name, 1)}
+                          >
+                            <div className="flex justify-between">
+                              <span>{food.name}</span>
+                              <span className="text-wellness-darkGreen">{food.calories} cal</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -166,6 +247,15 @@ const FoodComparison: React.FC = () => {
               <div className="mt-2 px-3 py-1 bg-wellness-softGreen/40 rounded-full inline-flex items-center">
                 <Apple className="h-4 w-4 text-wellness-darkGreen mr-1" />
                 <span className="text-sm">{food1} ({quantity1}g)</span>
+                <button 
+                  className="ml-2 text-wellness-darkGreen/70 hover:text-wellness-darkGreen"
+                  onClick={() => {
+                    setFood1('');
+                    setSelectedCategory1(null);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
             )}
           </div>
@@ -174,31 +264,55 @@ const FoodComparison: React.FC = () => {
             <label className="block text-wellness-darkGreen font-medium mb-2">Second Food</label>
             <div className="flex gap-3">
               <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={searchTerm2}
-                  onChange={(e) => {
-                    setSearchTerm2(e.target.value);
-                    setShowDropdown2(true);
+                <button
+                  className="input-field w-full text-left flex items-center justify-between"
+                  onClick={() => {
+                    setShowCategoryDropdown2(!showCategoryDropdown2);
+                    setShowFoodsDropdown2(false);
                   }}
-                  placeholder="Search for a food..."
-                  className="input-field w-full"
-                  onFocus={() => setShowDropdown2(true)}
-                />
-                {showDropdown2 && searchTerm2 && (
+                >
+                  <span>{selectedCategory2 || "Select food category"}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+                {showCategoryDropdown2 && (
                   <div className="absolute z-10 mt-1 w-full bg-white border border-wellness-softGreen/50 rounded-lg shadow-lg max-h-60 overflow-auto">
-                    {getFilteredFoods(searchTerm2).length > 0 ? (
-                      getFilteredFoods(searchTerm2).map((food, index) => (
-                        <div
-                          key={index}
-                          className="px-4 py-2 hover:bg-wellness-softGreen/30 cursor-pointer transition-colors"
-                          onClick={() => selectFood(food, 'food2')}
-                        >
-                          {food}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-2 text-wellness-charcoal/70">No foods found</div>
+                    {foodCategories.map((category, index) => (
+                      <div
+                        key={index}
+                        className="px-4 py-2 hover:bg-wellness-softGreen/30 cursor-pointer transition-colors flex items-center gap-2"
+                        onClick={() => selectCategory(category, 2)}
+                      >
+                        {getCategoryIcon(category)}
+                        {category}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {selectedCategory2 && (
+                  <div className="mt-2">
+                    <button
+                      className="input-field w-full text-left flex items-center justify-between"
+                      onClick={() => setShowFoodsDropdown2(!showFoodsDropdown2)}
+                    >
+                      <span>{food2 || "Select food"}</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    {showFoodsDropdown2 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-wellness-softGreen/50 rounded-lg shadow-lg max-h-60 overflow-auto">
+                        {getFoodsInCategory(selectedCategory2).map((food, index) => (
+                          <div
+                            key={index}
+                            className="px-4 py-2 hover:bg-wellness-softGreen/30 cursor-pointer transition-colors"
+                            onClick={() => selectFood(food.name, 2)}
+                          >
+                            <div className="flex justify-between">
+                              <span>{food.name}</span>
+                              <span className="text-wellness-darkGreen">{food.calories} cal</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -216,6 +330,15 @@ const FoodComparison: React.FC = () => {
               <div className="mt-2 px-3 py-1 bg-wellness-softGreen/40 rounded-full inline-flex items-center">
                 <Banana className="h-4 w-4 text-wellness-darkGreen mr-1" />
                 <span className="text-sm">{food2} ({quantity2}g)</span>
+                <button 
+                  className="ml-2 text-wellness-darkGreen/70 hover:text-wellness-darkGreen"
+                  onClick={() => {
+                    setFood2('');
+                    setSelectedCategory2(null);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
             )}
           </div>
