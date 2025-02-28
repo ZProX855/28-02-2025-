@@ -1,11 +1,25 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, Camera, Image, X, CheckCircle, EggIcon, Loader } from 'lucide-react';
+import { Upload, Camera, Image, X, CheckCircle, Info, Loader, ShoppingBag } from 'lucide-react';
 import { recognizeMeal } from '../services/api';
 import { toast } from 'sonner';
 
+interface FoodItem {
+  name: string;
+  quantity?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fats?: number;
+  fiber?: number;
+  isContainer?: boolean;
+  description?: string;
+}
+
 interface MealData {
   foodIdentified: string;
+  detailedDescription?: string;
+  foodItems?: FoodItem[];
   nutritionInfo: {
     calories: number;
     protein: number;
@@ -13,7 +27,16 @@ interface MealData {
     fats: number;
     fiber: number;
   };
+  perServingInfo?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    fiber: number;
+    servingSize: string;
+  };
   recommendations: string;
+  fullAnalysis?: string;
 }
 
 const MealRecognition: React.FC = () => {
@@ -22,6 +45,7 @@ const MealRecognition: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<MealData | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [showFullDetails, setShowFullDetails] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,6 +73,7 @@ const MealRecognition: React.FC = () => {
         setSelectedImage(reader.result as string);
         setIsUploading(false);
         setResult(null); // Clear previous results
+        setShowFullDetails(false);
         // Auto-analyze the image after upload
         analyzeImage(reader.result as string);
       };
@@ -85,26 +110,14 @@ const MealRecognition: React.FC = () => {
         timeoutPromise
       ]) as MealData;
       
-      // With our new implementation, we should always get a result
       setResult(mealData);
+      
+      // Notify on successful analysis
+      toast.success('Meal analyzed successfully!');
     } catch (error) {
       console.error("Meal recognition error:", error);
-      
-      // Provide a fallback result for eggs
-      setResult({
-        foodIdentified: "Eggs",
-        nutritionInfo: {
-          calories: 72,
-          protein: 6,
-          carbs: 0.6,
-          fats: 5,
-          fiber: 0
-        },
-        recommendations: "🥗 Pair eggs with vegetables for a nutrient-dense meal\n💪 Eggs are perfect for muscle-building due to high-quality protein\n👍 To reduce cholesterol, consider using just egg whites occasionally"
-      });
-      
-      // Still show a toast to indicate there was an issue, but we recovered
-      toast.info('Using default analysis for this image');
+      setAnalyzeError("Error analyzing the meal. Please try again.");
+      toast.error('Error analyzing the meal');
     } finally {
       setIsAnalyzing(false);
     }
@@ -120,6 +133,7 @@ const MealRecognition: React.FC = () => {
     setSelectedImage(null);
     setResult(null);
     setAnalyzeError(null);
+    setShowFullDetails(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -143,6 +157,10 @@ const MealRecognition: React.FC = () => {
         return `${emoji} ${line}`;
       })
       .join('\n');
+  };
+
+  const toggleFullDetails = () => {
+    setShowFullDetails(!showFullDetails);
   };
 
   return (
@@ -234,7 +252,34 @@ const MealRecognition: React.FC = () => {
               </div>
             )}
             
-            {!isAnalyzing && !result && (
+            {analyzeError && !isAnalyzing && !result && (
+              <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Analysis Error</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <p>{analyzeError}</p>
+                    </div>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={handleAnalyze}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {!isAnalyzing && !analyzeError && !result && (
               <button
                 onClick={handleAnalyze}
                 className="btn-primary rounded-lg w-full flex items-center justify-center gap-2"
@@ -253,30 +298,130 @@ const MealRecognition: React.FC = () => {
                   </div>
                   
                   <div className="p-3 bg-wellness-softGreen/20 rounded-lg mb-4">
-                    <p className="text-wellness-darkGreen">{result.foodIdentified}</p>
+                    <p className="text-wellness-darkGreen font-medium">{result.foodIdentified}</p>
+                    {result.detailedDescription && (
+                      <p className="text-sm text-wellness-charcoal mt-2">{result.detailedDescription}</p>
+                    )}
                   </div>
                   
-                  <h4 className="font-medium text-wellness-darkGreen mb-2">Nutrition Information</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-                    <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
-                      <div className="text-sm text-wellness-charcoal">Calories</div>
-                      <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.calories}</div>
+                  {/* Per Item Nutrition */}
+                  {result.foodItems && result.foodItems.length > 0 && showFullDetails && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-wellness-darkGreen mb-3">Individual Items</h4>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {result.foodItems.filter(item => !item.isContainer).map((item, index) => (
+                          <div key={index} className="p-3 bg-wellness-softGreen/10 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                              <p className="font-medium text-wellness-darkGreen">{item.name}</p>
+                              {item.quantity && <span className="text-xs bg-wellness-softGreen/40 px-2 py-1 rounded-full">{item.quantity}</span>}
+                            </div>
+                            
+                            {(item.calories !== undefined || item.protein !== undefined) && (
+                              <div className="grid grid-cols-5 gap-2">
+                                <div className="bg-wellness-softGreen/30 p-2 rounded-lg text-center">
+                                  <div className="text-xs text-wellness-charcoal">Cal</div>
+                                  <div className="font-medium text-wellness-darkGreen text-sm">{item.calories || 0}</div>
+                                </div>
+                                <div className="bg-wellness-softGreen/30 p-2 rounded-lg text-center">
+                                  <div className="text-xs text-wellness-charcoal">Prot</div>
+                                  <div className="font-medium text-wellness-darkGreen text-sm">{item.protein || 0}g</div>
+                                </div>
+                                <div className="bg-wellness-softGreen/30 p-2 rounded-lg text-center">
+                                  <div className="text-xs text-wellness-charcoal">Carbs</div>
+                                  <div className="font-medium text-wellness-darkGreen text-sm">{item.carbs || 0}g</div>
+                                </div>
+                                <div className="bg-wellness-softGreen/30 p-2 rounded-lg text-center">
+                                  <div className="text-xs text-wellness-charcoal">Fats</div>
+                                  <div className="font-medium text-wellness-darkGreen text-sm">{item.fats || 0}g</div>
+                                </div>
+                                <div className="bg-wellness-softGreen/30 p-2 rounded-lg text-center">
+                                  <div className="text-xs text-wellness-charcoal">Fiber</div>
+                                  <div className="font-medium text-wellness-darkGreen text-sm">{item.fiber || 0}g</div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {item.description && !item.calories && (
+                              <p className="text-sm text-wellness-charcoal mt-1">{item.description}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
-                      <div className="text-sm text-wellness-charcoal">Protein</div>
-                      <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.protein}g</div>
+                  )}
+                  
+                  {/* Per Serving Information */}
+                  {result.perServingInfo && showFullDetails && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-wellness-darkGreen mb-2">Per Serving Nutrition</h4>
+                      <div className="p-3 bg-wellness-softGreen/20 rounded-lg">
+                        <div className="mb-2">
+                          <span className="text-sm bg-wellness-softGreen/50 px-2 py-1 rounded-full text-wellness-darkGreen">
+                            {result.perServingInfo.servingSize}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-5 gap-2">
+                          <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center">
+                            <div className="text-xs text-wellness-charcoal">Calories</div>
+                            <div className="font-medium text-wellness-darkGreen text-lg">{result.perServingInfo.calories}</div>
+                          </div>
+                          <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center">
+                            <div className="text-xs text-wellness-charcoal">Protein</div>
+                            <div className="font-medium text-wellness-darkGreen text-lg">{result.perServingInfo.protein}g</div>
+                          </div>
+                          <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center">
+                            <div className="text-xs text-wellness-charcoal">Carbs</div>
+                            <div className="font-medium text-wellness-darkGreen text-lg">{result.perServingInfo.carbs}g</div>
+                          </div>
+                          <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center">
+                            <div className="text-xs text-wellness-charcoal">Fats</div>
+                            <div className="font-medium text-wellness-darkGreen text-lg">{result.perServingInfo.fats}g</div>
+                          </div>
+                          <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center">
+                            <div className="text-xs text-wellness-charcoal">Fiber</div>
+                            <div className="font-medium text-wellness-darkGreen text-lg">{result.perServingInfo.fiber}g</div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
-                      <div className="text-sm text-wellness-charcoal">Carbs</div>
-                      <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.carbs}g</div>
+                  )}
+                  
+                  {/* Total Nutrition Information */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-wellness-darkGreen mb-2">{showFullDetails ? "Total Nutrition" : "Nutrition Information"}</h4>
+                      <button 
+                        onClick={toggleFullDetails}
+                        className="text-xs bg-wellness-softGreen/50 px-2 py-1 rounded-full text-wellness-darkGreen flex items-center gap-1"
+                      >
+                        <Info className="h-3 w-3" />
+                        {showFullDetails ? "Show Less" : "Show Details"}
+                      </button>
                     </div>
-                    <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
-                      <div className="text-sm text-wellness-charcoal">Fats</div>
-                      <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.fats}g</div>
-                    </div>
-                    <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
-                      <div className="text-sm text-wellness-charcoal">Fiber</div>
-                      <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.fiber}g</div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
+                        <div className="text-sm text-wellness-charcoal">Calories</div>
+                        <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.calories}</div>
+                      </div>
+                      <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
+                        <div className="text-sm text-wellness-charcoal">Protein</div>
+                        <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.protein}g</div>
+                      </div>
+                      <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
+                        <div className="text-sm text-wellness-charcoal">Carbs</div>
+                        <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.carbs}g</div>
+                      </div>
+                      <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
+                        <div className="text-sm text-wellness-charcoal">Fats</div>
+                        <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.fats}g</div>
+                      </div>
+                      <div className="bg-wellness-softGreen/40 p-2 rounded-lg text-center flex flex-col justify-center">
+                        <div className="text-sm text-wellness-charcoal">Fiber</div>
+                        <div className="font-medium text-wellness-darkGreen text-lg">{result.nutritionInfo.fiber}g</div>
+                      </div>
                     </div>
                   </div>
                   
@@ -299,8 +444,9 @@ const MealRecognition: React.FC = () => {
                     onClick={() => {
                       toast.success('Meal saved to your history!');
                     }}
-                    className="flex-1 py-2 px-4 bg-wellness-darkGreen text-white rounded-lg hover:bg-wellness-darkGreen/90 transition-colors"
+                    className="flex-1 py-2 px-4 bg-wellness-darkGreen text-white rounded-lg hover:bg-wellness-darkGreen/90 transition-colors flex items-center justify-center gap-2"
                   >
+                    <ShoppingBag className="h-4 w-4" />
                     Save to History
                   </button>
                 </div>
