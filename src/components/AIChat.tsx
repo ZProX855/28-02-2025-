@@ -70,6 +70,60 @@ const AIChat: React.FC = () => {
     }
   };
 
+  // Function to format AI responses with better visual styling
+  const formatAIResponse = (text: string) => {
+    // Check if the text already contains bullet points
+    if (text.includes('•') || text.includes('*') || text.includes('- ')) {
+      // Split by lines
+      const lines = text.split('\n');
+      
+      // Process each line
+      return lines.map((line, index) => {
+        // Check if line is a bullet point
+        if (line.match(/^(\s*[\*\-•]\s|\s*\d+\.\s)/)) {
+          // Extract emoji if present
+          const emojiMatch = line.match(/(\p{Emoji})/u);
+          const emoji = emojiMatch ? emojiMatch[0] : '';
+          
+          // Clean the line from bullet point markers
+          const cleanLine = line.replace(/^(\s*[\*\-•]\s|\s*\d+\.\s)/, '').trim();
+          
+          // If emoji is already in the cleanLine, don't add it again
+          const finalLine = emoji && !cleanLine.includes(emoji) 
+            ? `${emoji} ${cleanLine.replace(emoji, '').trim()}` 
+            : cleanLine;
+          
+          return (
+            <div key={index} className="flex items-start mb-2">
+              {!finalLine.match(/^\p{Emoji}/u) && (
+                <span className="text-wellness-mediumGreen mr-2 text-xl">•</span>
+              )}
+              <div className="bg-wellness-softGreen/30 px-3 py-2 rounded-lg text-wellness-darkGreen flex-1">
+                {finalLine}
+              </div>
+            </div>
+          );
+        } else if (line.toLowerCase().includes('recommendation:') || line.toLowerCase().includes('tip:') || line.toLowerCase().includes('summary:')) {
+          // Style section headers
+          return (
+            <div key={index} className="font-medium text-wellness-darkGreen mt-2 mb-1 border-b border-wellness-softGreen/50 pb-1">
+              {line}
+            </div>
+          );
+        } else if (line.trim() === '') {
+          // Add spacing for empty lines
+          return <div key={index} className="h-2"></div>;
+        } else {
+          // Regular text
+          return <p key={index} className="mb-2">{line}</p>;
+        }
+      });
+    } else {
+      // If no bullet points, return the text as is
+      return <p>{text}</p>;
+    }
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto bg-white bg-opacity-80 backdrop-blur-sm shadow-sm rounded-2xl border border-wellness-softGreen/30 overflow-hidden flex flex-col h-[600px]">
       <div className="p-4 bg-wellness-softGreen border-b border-wellness-softGreen/30">
@@ -85,19 +139,25 @@ const AIChat: React.FC = () => {
             style={{ animationDelay: `${index * 100}ms` }}
           >
             <div 
-              className={`max-w-[80%] p-3 rounded-2xl ${
+              className={`max-w-[85%] p-3 rounded-2xl ${
                 message.isUser 
-                  ? 'bg-wellness-darkGreen text-white rounded-tr-none' 
-                  : 'bg-wellness-softGreen/50 text-wellness-charcoal rounded-tl-none'
+                  ? 'bg-wellness-darkGreen text-white rounded-tr-none shadow-md' 
+                  : 'bg-wellness-softGreen/50 text-wellness-charcoal rounded-tl-none shadow-sm'
               }`}
             >
-              <div className="whitespace-pre-line">{message.text}</div>
+              {message.isUser ? (
+                <div className="whitespace-pre-line">{message.text}</div>
+              ) : (
+                <div className="ai-response prose prose-sm max-w-none prose-p:my-1 prose-headings:mb-2 prose-headings:mt-4">
+                  {formatAIResponse(message.text)}
+                </div>
+              )}
             </div>
           </div>
         ))}
         {isLoading && (
           <div className="flex justify-start animate-slide-up">
-            <div className="max-w-[80%] p-3 rounded-2xl bg-wellness-softGreen/50 text-wellness-charcoal rounded-tl-none">
+            <div className="max-w-[85%] p-4 rounded-2xl bg-wellness-softGreen/50 text-wellness-charcoal rounded-tl-none">
               <div className="flex space-x-2">
                 <div className="w-2 h-2 bg-wellness-darkGreen rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
                 <div className="w-2 h-2 bg-wellness-darkGreen rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
