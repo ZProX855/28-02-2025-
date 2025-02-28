@@ -150,7 +150,7 @@ export const getAllFoods = () => {
 };
 
 // Helper function for Gemini API calls
-async function callGeminiAPI(prompt: string, temperature: number = 0.5, isVision: boolean = false, imageData?: string) {
+async function callGeminiAPI(prompt: string, temperature: number = 0.7, isVision: boolean = false, imageData?: string) {
   try {
     const model = isVision ? "gemini-1.5-vision" : "gemini-2.0-flash";
     const url = `${GEMINI_API_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`;
@@ -167,13 +167,20 @@ async function callGeminiAPI(prompt: string, temperature: number = 0.5, isVision
     
     // Add image data for vision model if provided
     if (isVision && imageData) {
+      // Extract mime type and base64 data properly
+      const mimeTypeMatch = imageData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/);
+      const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+      const base64Data = imageData.replace(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/, '');
+
       requestBody.contents[0].parts.unshift({
         inlineData: {
-          mimeType: "image/jpeg",
-          data: imageData.split(',')[1] // Remove the data:image/jpeg;base64, part
+          mimeType: mimeType,
+          data: base64Data
         }
       });
     }
+    
+    console.log(`Calling ${model} API...`);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -184,10 +191,18 @@ async function callGeminiAPI(prompt: string, temperature: number = 0.5, isVision
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error("API Error Response:", errorData);
+      throw new Error(`API error: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`);
     }
     
     const data = await response.json();
+    
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+      console.error("Unexpected API response format:", data);
+      throw new Error("Invalid response format from API");
+    }
+    
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
     console.error("Error calling Gemini API:", error);
@@ -381,30 +396,62 @@ export const calculateBMI = async (height: number, weight: number) => {
 // Meal recognition function with AI vision model
 export const recognizeMeal = async (imageData: string) => {
   try {
+    // First, validate the image data
+    if (!imageData || !imageData.startsWith('data:image/')) {
+      throw new Error("Invalid image data");
+    }
+    
+    // Try to analyze the image with Gemini Vision model
     const prompt = `
-      You are a professional nutritionist analyzing a food image. Please provide:
+      You are a professional nutritionist analyzing a food image. Please provide the following information about the food in the image:
       
-      1. Briefly identify what foods are in this meal - keep it to one short sentence
+      1. IDENTIFICATION
+      What foods are in this meal? Be specific and detailed. If there are no food items visible, say "No food detected".
       
-      2. Provide estimated nutritional values with ONLY specific numbers:
-         - Calories: [number]
-         - Protein: [number]g
-         - Carbs: [number]g 
-         - Fats: [number]g
-         - Fiber: [number]g
+      2. NUTRITION INFORMATION (Provide specific numbers for each)
+      - Calories: [number]
+      - Protein: [number] g
+      - Carbs: [number] g
+      - Fats: [number] g
+      - Fiber: [number] g
       
-      3. Give 3-4 bullet point recommendations with emojis, about:
-         - How could this meal be optimized
-         - Simple modifications to improve nutritional value
-         - Who might benefit most from this meal
+      3. RECOMMENDATIONS
+      Provide 3-4 brief bullet points about:
+      - How this meal could be balanced/improved
+      - Benefits of the foods in the image
+      - Suggestions for complementary foods
       
-      Keep your analysis very concise and clear. Use emojis in your bullet points.
+      Format your response clearly with emoji bullet points for the recommendations.
+      If you cannot identify any food in the image, respond with "No food detected in this image" and estimate zero for all nutritional values.
     `;
     
-    const aiResponse = await callGeminiAPI(prompt, 0.5, true, imageData);
+    // Call the Gemini Vision API
+    const aiResponse = await callGeminiAPI(prompt, 0.7, true, imageData);
+    
+    // Check if the API indicated no food was found
+    if (aiResponse.toLowerCase().includes("no food detected") || 
+        aiResponse.toLowerCase().includes("i cannot identify")) {
+      return {
+        foodIdentified: "Could not identify the meal",
+        nutritionInfo: {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fats: 0,
+          fiber: 0
+        },
+        recommendations: "We couldn't identify any food in this image. Please try again with a clearer image of food items.",
+        fullAnalysis: aiResponse
+      };
+    }
     
     // Parse the AI response to extract structured information
     const sections = aiResponse.split('\n\n');
+
+    // Handle case where response is not properly formatted
+    if (sections.length < 2) {
+      throw new Error("Unexpected response format from AI");
+    }
     
     let foodIdentified = "Unknown meal";
     let nutritionInfo = {
@@ -416,16 +463,28 @@ export const recognizeMeal = async (imageData: string) => {
     };
     let recommendations = "No recommendations available";
     
-    if (sections.length >= 3) {
-      foodIdentified = sections[0].trim();
-      
-      // Extract nutrition info from the second section
-      const nutritionText = sections[1];
-      const caloriesMatch = nutritionText.match(/calories:?\s*(\d+)/i);
-      const proteinMatch = nutritionText.match(/protein:?\s*(\d+)/i);
-      const carbsMatch = nutritionText.match(/carbs:?\s*(\d+)/i);
-      const fatsMatch = nutritionText.match(/fats:?\s*(\d+)/i);
-      const fiberMatch = nutritionText.match(/fiber:?\s*(\d+)/i);
+    // Extract identified food from first section
+    for (const section of sections) {
+      if (!section.toLowerCase().includes("calor") && 
+          !section.toLowerCase().includes("protein") &&
+          !section.toLowerCase().includes("recommend")) {
+        foodIdentified = section.trim();
+        break;
+      }
+    }
+    
+    // Find the nutrition section
+    const nutritionSection = sections.find(section => 
+      section.toLowerCase().includes("calor") && 
+      section.toLowerCase().includes("protein")
+    );
+    
+    if (nutritionSection) {
+      const caloriesMatch = nutritionSection.match(/calories:?\s*(\d+)/i);
+      const proteinMatch = nutritionSection.match(/protein:?\s*(\d+)/i);
+      const carbsMatch = nutritionSection.match(/carbs:?\s*(\d+)/i);
+      const fatsMatch = nutritionSection.match(/fats:?\s*(\d+)/i);
+      const fiberMatch = nutritionSection.match(/fiber:?\s*(\d+)/i);
       
       nutritionInfo = {
         calories: caloriesMatch ? parseInt(caloriesMatch[1]) : 0,
@@ -434,9 +493,27 @@ export const recognizeMeal = async (imageData: string) => {
         fats: fatsMatch ? parseInt(fatsMatch[1]) : 0,
         fiber: fiberMatch ? parseInt(fiberMatch[1]) : 0
       };
-      
-      recommendations = sections[2].trim();
     }
+    
+    // Find the recommendations section
+    const recommendationsSection = sections.find(section => 
+      section.toLowerCase().includes("recommend") || 
+      section.includes("•") || 
+      section.includes("- ") ||
+      /[\u{1F300}-\u{1F6FF}]/u.test(section)
+    );
+    
+    if (recommendationsSection) {
+      recommendations = recommendationsSection.trim();
+    }
+    
+    // Make sure values are positive numbers
+    Object.keys(nutritionInfo).forEach(key => {
+      const value = nutritionInfo[key as keyof typeof nutritionInfo];
+      if (typeof value === 'number' && (isNaN(value) || value < 0)) {
+        nutritionInfo[key as keyof typeof nutritionInfo] = 0;
+      }
+    });
     
     return {
       foodIdentified,
