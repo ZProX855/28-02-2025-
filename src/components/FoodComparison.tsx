@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { compareFoods, foodDatabase, getAllFoods } from '../services/api';
 import { toast } from 'sonner';
-import { Apple, Carrot, Banana, ChevronDown, X, Info } from 'lucide-react';
+import { Apple, Carrot, Banana, ChevronDown, X, Info, CheckCircle } from 'lucide-react';
 
 interface FoodData {
   name: string;
@@ -125,55 +125,39 @@ const FoodComparison: React.FC = () => {
     }
   };
 
-  const renderFoodCategories = () => {
+  // Render a nutrition card for a single food
+  const renderNutritionCard = (food: FoodData, quantity: number) => {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {Object.entries(foodDatabase).map(([category, foods], index) => {
-          const formattedCategory = category.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-          return (
-            <div 
-              key={category}
-              className="bg-white bg-opacity-60 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-wellness-softGreen/30 opacity-0 animate-fade-in cursor-pointer hover:border-wellness-mediumGreen transition-colors"
-              style={{ animationDelay: `${index * 150}ms` }}
-              onClick={() => {
-                if (!selectedCategory1) {
-                  selectCategory(formattedCategory, 1);
-                } else if (!selectedCategory2) {
-                  selectCategory(formattedCategory, 2);
-                }
-              }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                {getCategoryIcon(formattedCategory)}
-                <h3 className="text-wellness-darkGreen font-medium capitalize">{formattedCategory}</h3>
-              </div>
-              <div className="text-sm text-wellness-charcoal">
-                {foods.slice(0, 4).map((food: FoodData, i: number) => (
-                  <div key={i} className="mb-1 flex justify-between">
-                    <span>{food.name}</span>
-                    <span className="text-wellness-darkGreen">{food.calories} cal</span>
-                  </div>
-                ))}
-                {foods.length > 4 && <div className="text-xs text-wellness-mediumGreen">+ {foods.length - 4} more</div>}
-              </div>
-            </div>
-          );
-        })}
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-wellness-softGreen/20">
+        <h4 className="font-medium text-wellness-darkGreen text-center mb-3">{food.name} ({quantity}g)</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-wellness-softGreen/20 p-2 rounded-lg">
+            <div className="text-xs text-wellness-charcoal/70">Calories</div>
+            <div className="text-lg font-medium text-wellness-darkGreen">{(food.calories * quantity / 100).toFixed(1)} kcal</div>
+          </div>
+          <div className="bg-wellness-softGreen/20 p-2 rounded-lg">
+            <div className="text-xs text-wellness-charcoal/70">Protein</div>
+            <div className="text-lg font-medium text-wellness-darkGreen">{(food.protein * quantity / 100).toFixed(1)}g</div>
+          </div>
+          <div className="bg-wellness-softGreen/20 p-2 rounded-lg">
+            <div className="text-xs text-wellness-charcoal/70">Carbs</div>
+            <div className="text-lg font-medium text-wellness-darkGreen">{(food.carbs * quantity / 100).toFixed(1)}g</div>
+          </div>
+          <div className="bg-wellness-softGreen/20 p-2 rounded-lg">
+            <div className="text-xs text-wellness-charcoal/70">Fats</div>
+            <div className="text-lg font-medium text-wellness-darkGreen">{(food.fats * quantity / 100).toFixed(1)}g</div>
+          </div>
+          <div className="bg-wellness-softGreen/20 p-2 rounded-lg col-span-2">
+            <div className="text-xs text-wellness-charcoal/70">Fiber</div>
+            <div className="text-lg font-medium text-wellness-darkGreen">{(food.fiber * quantity / 100).toFixed(1)}g</div>
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Food Categories Display */}
-      <div className="p-4 bg-wellness-softGreen/20 rounded-xl mb-6">
-        <h3 className="text-wellness-darkGreen font-medium mb-4 flex items-center gap-2">
-          <Info className="h-5 w-5" />
-          Browse USDA Food Categories
-        </h3>
-        {renderFoodCategories()}
-      </div>
-      
       {/* Comparison Tool */}
       <div className="glass-panel p-6">
         <div className="flex flex-col md:flex-row gap-6 mb-6">
@@ -256,6 +240,13 @@ const FoodComparison: React.FC = () => {
                 >
                   <X className="h-3 w-3" />
                 </button>
+              </div>
+            )}
+            
+            {/* Individual food nutrition card */}
+            {food1 && result && (
+              <div className="mt-4">
+                {renderNutritionCard(result.food1, quantity1)}
               </div>
             )}
           </div>
@@ -341,6 +332,13 @@ const FoodComparison: React.FC = () => {
                 </button>
               </div>
             )}
+            
+            {/* Individual food nutrition card */}
+            {food2 && result && (
+              <div className="mt-4">
+                {renderNutritionCard(result.food2, quantity2)}
+              </div>
+            )}
           </div>
         </div>
         
@@ -354,7 +352,7 @@ const FoodComparison: React.FC = () => {
         
         {result && (
           <div className="bg-white bg-opacity-70 rounded-xl p-4 shadow-sm border border-wellness-softGreen/30 animate-scale-in">
-            <h3 className="text-center text-xl text-wellness-darkGreen font-medium mb-4">Comparison Results</h3>
+            <h3 className="text-center text-xl text-wellness-darkGreen font-medium mb-4">Nutritional Comparison</h3>
             
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -417,22 +415,35 @@ const FoodComparison: React.FC = () => {
             
             {result.insights && (
               <div className="mt-4 p-4 bg-wellness-softGreen/30 rounded-lg">
-                <h4 className="font-medium text-wellness-darkGreen mb-2">AI Insights</h4>
-                <p className="text-wellness-charcoal text-sm whitespace-pre-line">{result.insights}</p>
-              </div>
-            )}
-            
-            {!result.insights && (
-              <div className="mt-4 p-3 bg-wellness-softGreen/30 rounded-lg text-sm">
-                <span className="font-medium text-wellness-darkGreen">Summary:</span> {' '}
-                {result.food1.calories < result.food2.calories
-                  ? `${result.food1.name} has ${(result.food2.calories - result.food1.calories).toFixed(1)} fewer calories than ${result.food2.name}.`
-                  : `${result.food2.name} has ${(result.food1.calories - result.food2.calories).toFixed(1)} fewer calories than ${result.food1.name}.`
-                } {' '}
-                {result.food1.protein > result.food2.protein
-                  ? `${result.food1.name} provides ${(result.food1.protein - result.food2.protein).toFixed(1)}g more protein.`
-                  : `${result.food2.name} provides ${(result.food2.protein - result.food1.protein).toFixed(1)}g more protein.`
-                }
+                <h4 className="font-medium text-wellness-darkGreen mb-2 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-wellness-darkGreen" />
+                  AI Insights
+                </h4>
+                <div className="text-wellness-charcoal text-sm whitespace-pre-line">
+                  {/* Replace the insights with a bulleted version */}
+                  <ul className="space-y-2 list-none">
+                    <li className="flex items-start">
+                      <span className="text-wellness-darkGreen mr-2">🥗</span>
+                      <span><strong>Nutrient Density:</strong> {result.food1.calories > result.food2.calories ? result.food1.name : result.food2.name} is more calorie-dense, while {result.food1.protein > result.food2.protein ? result.food1.name : result.food2.name} offers more protein per serving.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-wellness-darkGreen mr-2">💪</span>
+                      <span><strong>Protein Content:</strong> {result.food1.protein > result.food2.protein ? result.food1.name : result.food2.name} provides {Math.abs(result.food1.protein - result.food2.protein).toFixed(1)}g more protein, making it better for muscle building.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-wellness-darkGreen mr-2">🍽️</span>
+                      <span><strong>Dietary Goals:</strong> For weight loss, favor {result.food1.calories < result.food2.calories ? result.food1.name : result.food2.name}. For muscle building, {result.food1.protein > result.food2.protein ? result.food1.name : result.food2.name} is preferable.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-wellness-darkGreen mr-2">📊</span>
+                      <span><strong>Fiber Content:</strong> {result.food1.fiber > result.food2.fiber ? result.food1.name : result.food2.name} offers more fiber, supporting digestive health and sustained energy.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-wellness-darkGreen mr-2">👍</span>
+                      <span><strong>Recommendation:</strong> Combine both foods for a balanced nutritional profile if appropriate for your diet.</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             )}
           </div>
