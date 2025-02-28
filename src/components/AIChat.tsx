@@ -37,10 +37,24 @@ const AIChat: React.FC = () => {
     
     try {
       const response = await getChatResponse(userMessage);
-      setMessages(prev => [...prev, { text: response.text, isUser: false }]);
+      if (response.error) {
+        // Handle API error but don't show the technical details to the user
+        console.error("Chat API error:", response.error);
+        setMessages(prev => [...prev, { 
+          text: "I'm sorry, I couldn't process your request right now. Please try again later.", 
+          isUser: false 
+        }]);
+        toast.error("Couldn't get a response. Please try again.");
+      } else {
+        setMessages(prev => [...prev, { text: response.text, isUser: false }]);
+      }
     } catch (error) {
-      toast.error("Couldn't get a response. Please try again.");
       console.error("Chat error:", error);
+      setMessages(prev => [...prev, { 
+        text: "I'm sorry, I couldn't process your request right now. Please try again later.", 
+        isUser: false 
+      }]);
+      toast.error("Couldn't get a response. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -48,6 +62,12 @@ const AIChat: React.FC = () => {
 
   const handleSuggestionClick = (suggestion: string) => {
     setInput(suggestion);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !isLoading) {
+      handleSend();
+    }
   };
 
   return (
@@ -112,7 +132,7 @@ const AIChat: React.FC = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onKeyPress={handleKeyPress}
             placeholder="Ask about nutrition..."
             className="flex-1 input-field rounded-full text-wellness-charcoal"
             disabled={isLoading}

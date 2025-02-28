@@ -112,9 +112,11 @@ async function callGeminiAPI(prompt: string, temperature: number = 0.5, isVision
             { text: prompt }
           ]
         }
-      ],
-      temperature: temperature
+      ]
     };
+    
+    // Add temperature parameter as a query parameter, not in the body
+    // This is because the API doesn't accept temperature in the JSON body
     
     // Add image data for vision model if provided
     if (isVision && imageData) {
