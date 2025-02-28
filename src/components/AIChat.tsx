@@ -70,58 +70,59 @@ const AIChat: React.FC = () => {
     }
   };
 
-  // Function to format AI responses with better visual styling
+  // Enhanced function to format AI responses with better visual styling
   const formatAIResponse = (text: string) => {
-    // Check if the text already contains bullet points
-    if (text.includes('•') || text.includes('*') || text.includes('- ')) {
-      // Split by lines
-      const lines = text.split('\n');
-      
-      // Process each line
-      return lines.map((line, index) => {
-        // Check if line is a bullet point
-        if (line.match(/^(\s*[\*\-•]\s|\s*\d+\.\s)/)) {
-          // Extract emoji if present
-          const emojiMatch = line.match(/(\p{Emoji})/u);
-          const emoji = emojiMatch ? emojiMatch[0] : '';
-          
-          // Clean the line from bullet point markers
-          const cleanLine = line.replace(/^(\s*[\*\-•]\s|\s*\d+\.\s)/, '').trim();
-          
-          // If emoji is already in the cleanLine, don't add it again
-          const finalLine = emoji && !cleanLine.includes(emoji) 
-            ? `${emoji} ${cleanLine.replace(emoji, '').trim()}` 
-            : cleanLine;
-          
-          return (
-            <div key={index} className="flex items-start mb-2">
-              {!finalLine.match(/^\p{Emoji}/u) && (
-                <span className="text-wellness-mediumGreen mr-2 text-xl">•</span>
-              )}
-              <div className="bg-wellness-softGreen/30 px-3 py-2 rounded-lg text-wellness-darkGreen flex-1">
-                {finalLine}
-              </div>
+    // Replace asterisks with more visually appealing bullet points
+    const processedText = text.replace(/^\s*\*\s*/gm, '• ');
+    
+    // Split by lines
+    const lines = processedText.split('\n');
+    
+    // Process each line
+    return lines.map((line, index) => {
+      // Check if line is a bullet point (handle various bullet styles but never use asterisks)
+      if (line.match(/^(\s*[•\-]\s|\s*\d+\.\s)/)) {
+        // Extract emoji if present
+        const emojiMatch = line.match(/(\p{Emoji})/u);
+        const emoji = emojiMatch ? emojiMatch[0] : '';
+        
+        // Clean the line from bullet point markers
+        const cleanLine = line.replace(/^(\s*[•\-]\s|\s*\d+\.\s)/, '').trim();
+        
+        // If emoji is already in the cleanLine, don't add it again
+        const finalLine = emoji && !cleanLine.includes(emoji) 
+          ? `${emoji} ${cleanLine.replace(emoji, '').trim()}` 
+          : cleanLine;
+        
+        return (
+          <div key={index} className="flex items-start mb-3">
+            {!finalLine.match(/^\p{Emoji}/u) && (
+              <span className="text-wellness-mediumGreen mr-2 text-xl">•</span>
+            )}
+            <div className="bg-wellness-softGreen/30 px-3 py-2.5 rounded-lg text-wellness-darkGreen flex-1 font-medium">
+              {finalLine}
             </div>
-          );
-        } else if (line.toLowerCase().includes('recommendation:') || line.toLowerCase().includes('tip:') || line.toLowerCase().includes('summary:')) {
-          // Style section headers
-          return (
-            <div key={index} className="font-medium text-wellness-darkGreen mt-2 mb-1 border-b border-wellness-softGreen/50 pb-1">
-              {line}
-            </div>
-          );
-        } else if (line.trim() === '') {
-          // Add spacing for empty lines
-          return <div key={index} className="h-2"></div>;
-        } else {
-          // Regular text
-          return <p key={index} className="mb-2">{line}</p>;
-        }
-      });
-    } else {
-      // If no bullet points, return the text as is
-      return <p>{text}</p>;
-    }
+          </div>
+        );
+      } else if (line.toLowerCase().includes('recommendation:') || line.toLowerCase().includes('tip:') || line.toLowerCase().includes('summary:')) {
+        // Style section headers with more emphasis
+        return (
+          <div key={index} className="font-semibold text-wellness-darkGreen mt-3 mb-2 border-b border-wellness-softGreen/70 pb-1 bg-wellness-softGreen/20 px-3 py-1.5 rounded-t-lg">
+            {line}
+          </div>
+        );
+      } else if (line.trim() === '') {
+        // Add spacing for empty lines
+        return <div key={index} className="h-2"></div>;
+      } else {
+        // Regular text with improved styling
+        return (
+          <p key={index} className="mb-2.5 px-1.5 text-wellness-charcoal leading-relaxed">
+            {line}
+          </p>
+        );
+      }
+    });
   };
 
   return (
@@ -142,7 +143,7 @@ const AIChat: React.FC = () => {
               className={`max-w-[85%] p-3 rounded-2xl ${
                 message.isUser 
                   ? 'bg-wellness-darkGreen text-white rounded-tr-none shadow-md' 
-                  : 'bg-wellness-softGreen/50 text-wellness-charcoal rounded-tl-none shadow-sm'
+                  : 'bg-wellness-softGreen/40 text-wellness-charcoal rounded-tl-none shadow-sm'
               }`}
             >
               {message.isUser ? (
@@ -157,7 +158,7 @@ const AIChat: React.FC = () => {
         ))}
         {isLoading && (
           <div className="flex justify-start animate-slide-up">
-            <div className="max-w-[85%] p-4 rounded-2xl bg-wellness-softGreen/50 text-wellness-charcoal rounded-tl-none">
+            <div className="max-w-[85%] p-4 rounded-2xl bg-wellness-softGreen/40 text-wellness-charcoal rounded-tl-none">
               <div className="flex space-x-2">
                 <div className="w-2 h-2 bg-wellness-darkGreen rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
                 <div className="w-2 h-2 bg-wellness-darkGreen rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
