@@ -149,7 +149,7 @@ export const getAllFoods = () => {
   return allCategories.flat();
 };
 
-// Helper function for Gemini API calls
+// Helper function for Gemini API calls - updated with robust error handling
 async function callGeminiAPI(prompt: string, temperature: number = 0.7, isVision: boolean = false, imageData?: string) {
   try {
     const model = isVision ? "gemini-1.5-vision" : "gemini-2.0-flash";
@@ -162,26 +162,35 @@ async function callGeminiAPI(prompt: string, temperature: number = 0.7, isVision
             { text: prompt }
           ]
         }
-      ]
+      ],
+      generationConfig: {
+        temperature: temperature
+      }
     };
     
     // Add image data for vision model if provided
     if (isVision && imageData) {
-      // Extract mime type and base64 data properly
-      const mimeTypeMatch = imageData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/);
-      const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
-      const base64Data = imageData.replace(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/, '');
-
-      requestBody.contents[0].parts.unshift({
-        inlineData: {
-          mimeType: mimeType,
-          data: base64Data
-        }
-      });
+      try {
+        // Extract mime type and base64 data properly
+        const mimeTypeMatch = imageData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/);
+        const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+        const base64Data = imageData.replace(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/, '');
+        
+        requestBody.contents[0].parts.unshift({
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        });
+      } catch (imageError) {
+        console.error("Error processing image data:", imageError);
+        throw new Error("Failed to process image data");
+      }
     }
     
     console.log(`Calling ${model} API...`);
     
+    // Make API request with robust error handling
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -191,15 +200,27 @@ async function callGeminiAPI(prompt: string, temperature: number = 0.7, isVision
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("API Error Response:", errorData);
-      throw new Error(`API error: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`);
+      const errorText = await response.text();
+      let errorMessage = `API error: ${response.status}`;
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = `API error: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`;
+        console.error("API Error Response:", errorData);
+      } catch (e) {
+        console.error("API Error Response (non-JSON):", errorText);
+      }
+      
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
     
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
-      console.error("Unexpected API response format:", data);
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error("Empty response from API");
+    }
+    
+    if (!data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
       throw new Error("Invalid response format from API");
     }
     
@@ -393,7 +414,7 @@ export const calculateBMI = async (height: number, weight: number) => {
   }
 };
 
-// Meal recognition function with AI vision model
+// Meal recognition function with AI vision model - fixed to properly handle image data and parsing
 export const recognizeMeal = async (imageData: string) => {
   try {
     // First, validate the image data
@@ -403,34 +424,34 @@ export const recognizeMeal = async (imageData: string) => {
     
     // Try to analyze the image with Gemini Vision model
     const prompt = `
-      You are a professional nutritionist analyzing a food image. Please provide the following information about the food in the image:
+      Analyze this food image as a professional nutritionist. Keep your answers concise and numbered.
       
-      1. IDENTIFICATION
-      What foods are in this meal? Be specific and detailed. If there are no food items visible, say "No food detected".
+      1. IDENTIFICATION:
+      What food(s) are in this image? Be specific but brief (max 1-2 sentences).
       
-      2. NUTRITION INFORMATION (Provide specific numbers for each)
+      2. NUTRITION INFORMATION (provide specific numbers):
       - Calories: [number]
       - Protein: [number] g
       - Carbs: [number] g
       - Fats: [number] g
       - Fiber: [number] g
       
-      3. RECOMMENDATIONS
-      Provide 3-4 brief bullet points about:
-      - How this meal could be balanced/improved
-      - Benefits of the foods in the image
-      - Suggestions for complementary foods
+      3. RECOMMENDATIONS (use emoji bullet points):
+      • How this meal could be improved nutritionally
+      • Who might benefit most from this meal
+      • A simple tip for balancing this meal
       
-      Format your response clearly with emoji bullet points for the recommendations.
-      If you cannot identify any food in the image, respond with "No food detected in this image" and estimate zero for all nutritional values.
+      If you cannot identify any food, respond with "No food detected in this image" and provide zeros for nutritional values.
     `;
     
-    // Call the Gemini Vision API
-    const aiResponse = await callGeminiAPI(prompt, 0.7, true, imageData);
+    // Call the Gemini Vision API - using lower temperature for more precise responses
+    const aiResponse = await callGeminiAPI(prompt, 0.4, true, imageData);
     
     // Check if the API indicated no food was found
     if (aiResponse.toLowerCase().includes("no food detected") || 
-        aiResponse.toLowerCase().includes("i cannot identify")) {
+        aiResponse.toLowerCase().includes("cannot identify") ||
+        aiResponse.toLowerCase().includes("not a food") ||
+        aiResponse.toLowerCase().includes("no meal")) {
       return {
         foodIdentified: "Could not identify the meal",
         nutritionInfo: {
@@ -446,12 +467,8 @@ export const recognizeMeal = async (imageData: string) => {
     }
     
     // Parse the AI response to extract structured information
-    const sections = aiResponse.split('\n\n');
-
-    // Handle case where response is not properly formatted
-    if (sections.length < 2) {
-      throw new Error("Unexpected response format from AI");
-    }
+    let sections = aiResponse.split(/\n\s*\n|\n\d+\.\s+/); // Split by numbered sections or double newlines
+    sections = sections.filter(section => section.trim().length > 0); // Remove empty sections
     
     let foodIdentified = "Unknown meal";
     let nutritionInfo = {
@@ -463,19 +480,21 @@ export const recognizeMeal = async (imageData: string) => {
     };
     let recommendations = "No recommendations available";
     
-    // Extract identified food from first section
-    for (const section of sections) {
-      if (!section.toLowerCase().includes("calor") && 
-          !section.toLowerCase().includes("protein") &&
-          !section.toLowerCase().includes("recommend")) {
-        foodIdentified = section.trim();
-        break;
-      }
+    // Try to extract the food identification
+    const identificationSection = sections.find(section => 
+      !section.toLowerCase().includes("calor") && 
+      !section.toLowerCase().includes("nutri") &&
+      !section.toLowerCase().includes("recommend") &&
+      section.length < 200
+    ) || sections[0];
+    
+    if (identificationSection) {
+      foodIdentified = identificationSection.trim();
     }
     
-    // Find the nutrition section
+    // Try to extract nutrition information
     const nutritionSection = sections.find(section => 
-      section.toLowerCase().includes("calor") && 
+      (section.toLowerCase().includes("calor") || section.toLowerCase().includes("nutri")) && 
       section.toLowerCase().includes("protein")
     );
     
@@ -495,7 +514,7 @@ export const recognizeMeal = async (imageData: string) => {
       };
     }
     
-    // Find the recommendations section
+    // Try to extract recommendations
     const recommendationsSection = sections.find(section => 
       section.toLowerCase().includes("recommend") || 
       section.includes("•") || 
@@ -540,7 +559,7 @@ export const recognizeMeal = async (imageData: string) => {
   }
 };
 
-// Wellness journey insights function
+// Wellness journey insights function - fixed with improved error handling and JSON parsing
 export interface WellnessInsights {
   recommendations: string[];
   milestones: string[];
@@ -562,6 +581,7 @@ export const getWellnessInsights = async (goals: string[]): Promise<WellnessInsi
         "milestones": ["Week 1-2: 🌱 Milestone 1", "Month 1: 🏆 Milestone 2", ...]
       }
       
+      Important: Your response must be valid JSON that can be parsed with JSON.parse().
       Make sure to include emojis at the beginning of each recommendation and milestone.
       Each item should be very concise (15 words or less).
       For milestones, include a timeframe (e.g., "Week 1-2:", "Month 3:")
@@ -571,31 +591,63 @@ export const getWellnessInsights = async (goals: string[]): Promise<WellnessInsi
     
     try {
       // Try to parse the response as JSON
-      const parsedResponse = JSON.parse(aiResponse);
+      let jsonResponse = aiResponse;
+      
+      // If the response contains markdown code blocks, extract just the JSON
+      if (aiResponse.includes("```json")) {
+        const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          jsonResponse = jsonMatch[1].trim();
+        }
+      }
+      
+      // Remove any non-JSON text before or after the JSON object
+      // First, find the position of the first '{'
+      const firstBracePos = jsonResponse.indexOf('{');
+      // Find the position of the last '}'
+      const lastBracePos = jsonResponse.lastIndexOf('}');
+      
+      // If both braces exist, extract just the JSON object part
+      if (firstBracePos !== -1 && lastBracePos !== -1 && lastBracePos > firstBracePos) {
+        jsonResponse = jsonResponse.substring(firstBracePos, lastBracePos + 1);
+      }
+      
+      const parsedResponse = JSON.parse(jsonResponse);
+      
       return {
         recommendations: Array.isArray(parsedResponse.recommendations) ? parsedResponse.recommendations : [],
         milestones: Array.isArray(parsedResponse.milestones) ? parsedResponse.milestones : []
       };
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", parseError);
+      console.log("Raw AI response:", aiResponse);
       
       // Fallback: Try to extract recommendations and milestones from text
-      const recommendationsMatch = aiResponse.match(/recommendations:?\s*\n((?:- [^\n]+\n?)+)/i);
-      const milestonesMatch = aiResponse.match(/milestones:?\s*\n((?:- [^\n]+\n?)+)/i);
+      const extractItems = (text: string, pattern: RegExp): string[] => {
+        const matches = text.match(pattern);
+        if (!matches) return [];
+        
+        return matches.map(line => {
+          // Remove markers like "- " or "* " and trim
+          return line.replace(/^[-*•]\s+/, '').trim();
+        });
+      };
       
-      const recommendations = recommendationsMatch ? 
-        recommendationsMatch[1].split('\n')
-          .filter(line => line.trim().startsWith('- '))
-          .map(line => line.trim().substring(2)) : 
-        [];
+      const recommendationPattern = /[•*-]\s+(\p{Emoji})?.+/gu;
+      const milestonePattern = /[•*-]\s+(Week|Month|Day).+/g;
       
-      const milestones = milestonesMatch ? 
-        milestonesMatch[1].split('\n')
-          .filter(line => line.trim().startsWith('- '))
-          .map(line => line.trim().substring(2)) : 
-        [];
+      const recommendations = extractItems(aiResponse, recommendationPattern);
+      const milestones = extractItems(aiResponse, milestonePattern);
       
-      return { recommendations, milestones };
+      // If we couldn't extract at least one of each, use the fallback
+      if (recommendations.length === 0 || milestones.length === 0) {
+        throw new Error("Could not extract structured data from AI response");
+      }
+      
+      return {
+        recommendations: recommendations.slice(0, 5),
+        milestones: milestones.slice(0, 5)
+      };
     }
   } catch (error) {
     console.error("Wellness insights API error:", error);
