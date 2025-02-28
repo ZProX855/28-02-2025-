@@ -10,6 +10,12 @@ interface WellnessState {
   loading: boolean;
 }
 
+// Define an interface for the API response
+interface WellnessInsights {
+  recommendations: string[];
+  milestones: string[];
+}
+
 const WellnessJourney: React.FC = () => {
   const [state, setState] = useState<WellnessState>({
     goals: [
@@ -50,7 +56,8 @@ const WellnessJourney: React.FC = () => {
     setState({ ...state, loading: true });
     
     try {
-      const insights = await getWellnessInsights(selectedGoals);
+      // Explicitly type the result from getWellnessInsights
+      const insights = await getWellnessInsights(selectedGoals) as WellnessInsights;
       setState({
         ...state,
         recommendations: insights.recommendations,
